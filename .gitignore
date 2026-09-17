@@ -18,3 +18,4 @@ dist/
 node_modules/
 
 buy_disabled.json
+.env.cloudflare
