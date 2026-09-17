@@ -9,6 +9,7 @@ symbol_history.json
 .venv/
 *.csv
 *.txt
+!requirements-web.txt
 miniforge.sh
 logs/*.json
 *.json
