@@ -13,5 +13,8 @@ symbol_history.json
 miniforge.sh
 logs/*.json
 *.json
+bin/
+dist/
+node_modules/
 
 buy_disabled.json
