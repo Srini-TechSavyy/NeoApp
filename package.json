@@ -1,0 +1,16 @@
+{
+  "name": "neoapp-cloudflare-deploy",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "npm ci && npx wrangler deploy",
+    "cf:dry-run": "npm ci && npx wrangler deploy --dry-run",
+    "cf:list": "wrangler containers list",
+    "cf:images": "wrangler containers images list"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7",
+    "wrangler": "4.133.0"
+  }
+}

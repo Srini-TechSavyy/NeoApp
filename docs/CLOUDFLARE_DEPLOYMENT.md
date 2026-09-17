@@ -83,10 +83,11 @@ The container should expose the FastAPI app on `http://localhost:8080`.
 
 ## Wrangler setup
 
-Install the Node tooling once:
+From the repository root (the directory containing `package.json` and `package-lock.json`), install the Node tooling once:
 
 ```sh
-npm install
+cd /path/to/NeoApp2
+npm ci
 ```
 
 Authenticate Wrangler:
@@ -112,12 +113,16 @@ npx wrangler containers images list
 Dry-run the config locally before production deploy:
 
 ```sh
-npx wrangler dev
+cd /path/to/NeoApp2
+npm ci
+npx wrangler deploy --dry-run
 ```
 
 Deploy the container and Worker:
 
 ```sh
+cd /path/to/NeoApp2
+npm ci
 npx wrangler deploy
 ```
 
