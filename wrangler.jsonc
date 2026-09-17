@@ -1,0 +1,58 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "neoapp",
+  "main": "cloudflare/src/index.js",
+  "compatibility_date": "2026-09-17",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "containers": [
+    {
+      "class_name": "NeoAppContainer",
+      "image": "./Dockerfile",
+      "max_instances": 1,
+      "instance_type": {
+        "vcpu": 1,
+        "memory_mib": 1536,
+        "disk_mb": 4096
+      }
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "NEOAPP",
+        "class_name": "NeoAppContainer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["NeoAppContainer"]
+    }
+  ],
+  "vars": {
+    "TRADING_ENABLED": "false",
+    "WEB_ALLOW_LOCAL_NOAUTH": "false",
+    "WEB_LOG_LEVEL": "INFO",
+    "WORKER_HEALTH_WINDOW_SECONDS": "30",
+    "WEB_POLL_SECONDS": "5",
+    "WEB_MAX_BACKOFF_SECONDS": "60",
+    "WEB_STATE_FILE": "logs/web_monitor_state.json",
+    "WEB_STATE_LOCK_FILE": "logs/web_monitor_state.lock",
+    "BUY_DISABLED_FILE": "buy_disabled.json",
+    "AUTO_BUY_ENABLED": "false",
+    "AUTO_SELL_ENABLED": "false",
+    "AUTO_LOTS": "1",
+    "AUTO_TARGET": "2",
+    "AUTO_SL": "1.5",
+    "AUTO_TSL_STEP": "1",
+    "AUTO_PT_STEP": "1",
+    "AUTO_BASE_INDEX": "NIFTY",
+    "AUTO_STRIKE_OFFSET": "0",
+    "NIFTY_LOT_SIZE": "75"
+  }
+}
