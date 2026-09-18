@@ -3,120 +3,378 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>NeoApp Monitor</title>
+  <title>SCALPER &amp; MONITOR PRO</title>
   <style>
-    body { font-family: Inter, Segoe UI, Arial, sans-serif; background:#0b1220; color:#e5e7eb; margin:0; }
-    .wrap { max-width:900px; margin:24px auto; padding:16px; }
-    .card { background:#111827; border:1px solid #1f2937; border-radius:12px; padding:16px; margin-bottom:12px; }
-    h1 { margin:0 0 12px; font-size:22px; }
-    .title-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-    .title-row h1 { margin:0; }
-    #currentDateTime { font-size:13px; font-weight:600; color:#93c5fd; white-space:nowrap; }
-    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    input, button, select { background:#0f172a; color:#e5e7eb; border:1px solid #334155; border-radius:8px; padding:8px 10px; }
-    button { cursor:pointer; }
-    .kpi { display:grid; grid-template-columns:repeat(2,minmax(160px,1fr)); gap:8px; }
-    .pill { background:#0f172a; border:1px solid #334155; border-radius:8px; padding:8px; }
-    .green { color:#4ade80; }
-    .red { color:#f87171; }
-    .muted { color:#94a3b8; }
-    #status { font-weight:600; }
-    code { color:#93c5fd; }
+    :root {
+      --bg: #f5f5f5;
+      --panel: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --border: #d1d5db;
+      --mono-bg: #111827;
+      --mono-fg: #e5e7eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", Inter, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      margin: 0;
+      min-height: 100vh;
+      font-size: 14px;
+    }
+    .top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 6px 10px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .top-bar h1 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .top-meta {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #374151;
+    }
+    #serverIp { color: #059669; }
+    #connStatus.disconnected { color: #dc2626; }
+    #connStatus.connected { color: #059669; }
+
+    .main-container {
+      display: flex;
+      gap: 10px;
+      padding: 6px;
+      align-items: stretch;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    @media (max-width: 860px) {
+      .main-container { flex-direction: column; }
+    }
+
+    .scalper-panel {
+      flex: 1 1 520px;
+      background: var(--bg);
+      padding: 6px;
+      min-width: 0;
+    }
+    .monitor-panel {
+      flex: 0 1 340px;
+      background: var(--panel);
+      border: 2px groove #cbd5e1;
+      padding: 8px;
+      min-width: 280px;
+      display: flex;
+      flex-direction: column;
+    }
+    .monitor-panel h2 {
+      margin: 0 0 6px;
+      font-size: 13px;
+      text-align: center;
+    }
+    #monText {
+      flex: 1;
+      margin: 0;
+      min-height: 260px;
+      background: var(--mono-bg);
+      color: var(--mono-fg);
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 11px;
+      line-height: 1.45;
+      padding: 8px;
+      border-radius: 4px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 72px 1fr;
+      gap: 6px 8px;
+      align-items: center;
+    }
+    .form-grid .lbl {
+      text-align: right;
+      color: var(--text);
+      padding-right: 4px;
+    }
+    .row-inline {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+    }
+    input, select, button {
+      font: inherit;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 5px 8px;
+      background: #fff;
+      color: var(--text);
+    }
+    button { cursor: pointer; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .btn-sm { padding: 3px 8px; min-width: 28px; }
+    .btn-buy {
+      background: #d1fae5;
+      font-weight: 700;
+      min-width: 88px;
+    }
+    .btn-buy:hover:not(:disabled) { background: #a7f3d0; }
+    .btn-exit {
+      background: #fee2e2;
+      font-weight: 700;
+      min-width: 88px;
+    }
+    .btn-exit:hover:not(:disabled) { background: #fecaca; }
+    .btn-ce { background: #e6f4ea; color: #166534; min-width: 72px; font-weight: 600; }
+    .btn-pe { background: #fdecea; color: #991b1b; min-width: 72px; font-weight: 600; }
+    .badge-auto {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 4px;
+      background: #fef9c3;
+      border: 1px solid #fde047;
+      font-size: 12px;
+      font-weight: 600;
+      color: #713f12;
+    }
+    .badge-auto.on { background: #4ade80; border-color: #22c55e; color: #14532d; }
+
+    .params-readonly {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+    .params-readonly label { font-size: 12px; color: var(--muted); }
+    .params-readonly input {
+      width: 52px;
+      text-align: center;
+      background: #f9fafb;
+    }
+    .params-note {
+      font-size: 11px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin: 8px 0 4px;
+      grid-column: 1 / -1;
+      padding-left: 72px;
+    }
+
+    .status-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin: 4px 0 6px;
+      grid-column: 1 / -1;
+      padding-left: 72px;
+      font-size: 12px;
+    }
+    #buyStatusLabel { font-weight: 600; }
+    #positionLabel { font-weight: 700; }
+    #positionLabel.open { color: #ef4444; }
+    #positionLabel.flat { color: #6b7280; }
+    #strategyLabel {
+      margin-left: auto;
+      font-weight: 700;
+      font-size: 12px;
+      text-align: right;
+    }
+    #momentumAlert {
+      font-weight: 700;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: none;
+    }
+    #momentumAlert.show {
+      display: inline-block;
+      background: #ef4444;
+      color: #fff;
+    }
+
+    #logBox {
+      grid-column: 1 / -1;
+      width: 100%;
+      min-height: 120px;
+      max-height: 160px;
+      background: var(--mono-bg);
+      color: var(--mono-fg);
+      font-family: Consolas, monospace;
+      font-size: 11px;
+      padding: 6px;
+      border: none;
+      border-radius: 4px;
+      resize: vertical;
+    }
+
+    .web-connect {
+      margin-top: 8px;
+      padding: 8px;
+      border: 1px dashed #cbd5e1;
+      border-radius: 6px;
+      background: #fafafa;
+    }
+    .web-connect summary {
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .web-connect .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+    #message { font-size: 12px; margin-top: 6px; }
+    #tradeResponse {
+      font-size: 11px;
+      margin-top: 4px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--muted);
+    }
+    .green { color: #059669; }
+    .red { color: #dc2626; }
+    .muted { color: var(--muted); }
+    .na-tag {
+      font-size: 10px;
+      color: #9ca3af;
+      font-weight: normal;
+    }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <div class="title-row">
-        <h1>NeoApp Web Monitor</h1>
-        <div id="currentDateTime">--</div>
-      </div>
-      <div class="row">
-        <label>API Token</label>
-        <input id="token" type="password" placeholder="WEB_API_TOKEN (optional)" style="min-width:280px"/>
-        <button id="connectBtn">Connect</button>
-        <span id="status" class="muted">Disconnected</span>
-      </div>
-      <div class="muted" style="margin-top:8px">API: <code>/api/monitor/snapshot</code> | WS: <code>/ws/monitor</code></div>
-      <div id="message" class="muted" style="margin-top:8px">Click Connect to start live updates.</div>
+  <header class="top-bar">
+    <h1>SCALPER &amp; MONITOR PRO</h1>
+    <div class="top-meta">
+      <span>IP: <span id="serverIp">--</span></span>
+      <span id="currentDateTime">--</span>
+      <span id="connStatus" class="disconnected">Offline</span>
     </div>
+  </header>
 
-    <div class="card">
-      <div class="kpi">
-        <div class="pill">Trading Enabled: <b id="tradingEnabled">--</b></div>
-        <div class="pill">Worker Health: <b id="workerHealth">--</b></div>
-        <div class="pill">Risk: <b id="riskState">--</b></div>
-        <div class="pill">Position: <b id="positionState">--</b></div>
-        <div class="pill">Server IP: <b id="serverIp">--</b></div>
-      </div>
-    </div>
+  <div class="main-container">
+    <section class="scalper-panel">
+      <div class="form-grid">
+        <span class="lbl">Strike:</span>
+        <div class="row-inline">
+          <button type="button" class="btn-sm" id="strikeUp" title="Bump strike">▲</button>
+          <button type="button" class="btn-sm" id="strikeDown" title="Lower strike">▼</button>
+          <label class="muted" style="font-size:11px;margin-left:6px">Offset</label>
+          <select id="strikeOffset" style="width:88px">
+            <option value="0">ATM</option>
+          </select>
+          <button type="button" id="suggestBtn" style="margin-left:8px">Suggest</button>
+          <span id="indexLtpLive" class="muted na-tag"></span>
+        </div>
 
-    <div class="card">
-      <h1 style="font-size:18px">Strike Helper</h1>
-      <div class="row">
-        <label>Base</label>
-        <select id="baseSymbol">
-          <option value="NIFTY">NIFTY</option>
-          <option value="BANKNIFTY">BANKNIFTY</option>
-          <option value="SENSEX">SENSEX</option>
-          <option value="FINNIFTY">FINNIFTY</option>
-          <option value="BANKEX">BANKEX</option>
-        </select>
-        <label>Index LTP</label>
-        <input id="indexLtp" type="number" step="0.05" placeholder="e.g. 25324.5" style="width:140px" />
-        <label>Type</label>
-        <select id="optionType">
-          <option value="CE">CE</option>
-          <option value="PE">PE</option>
-        </select>
-        <label>Offset</label>
-        <input id="strikeOffset" type="number" min="-10" max="10" step="1" value="0" style="width:90px" />
-        <button id="suggestBtn">Suggest Symbol</button>
-      </div>
-      <div id="suggestedSymbol" class="muted" style="margin-top:8px">Suggested Symbol: --</div>
-    </div>
+        <span class="lbl">Option:</span>
+        <div>
+          <button type="button" id="cePeBtn" class="btn-ce">CE</button>
+        </div>
 
-    <div class="card">
-      <h1 style="font-size:18px">Trade Controls</h1>
-      <div class="row">
-        <label>Symbol</label>
-        <input id="tradeSymbol" type="text" placeholder="NIFTY26AUG25000CE" style="min-width:240px" />
-        <label>Lots</label>
-        <input id="tradeLots" type="number" min="1" step="1" value="1" style="width:100px" />
-      </div>
-      <div class="row" style="margin-top:10px">
-        <button id="buyBtn">BUY</button>
-        <button id="exitBtn">EXIT</button>
-        <span id="tradeStatus" class="muted">Idle</span>
-      </div>
-      <div id="tradeResponse" class="muted" style="margin-top:8px; white-space:pre-wrap; word-break:break-word">--</div>
-    </div>
+        <span class="lbl">Params:</span>
+        <div class="params-readonly">
+          <label>Lots</label>
+          <input id="tradeLots" type="number" min="1" step="1" value="1" style="width:48px;background:#fff" />
+          <label>Tgt</label>
+          <input id="paramTgt" readonly title="From worker snapshot" placeholder="—" />
+          <label>SL</label>
+          <input id="paramSl" readonly placeholder="—" />
+          <label>Trl</label>
+          <input id="paramTrl" readonly placeholder="—" />
+          <label>PT</label>
+          <input id="paramPt" readonly placeholder="—" />
+          <span id="paramsNote" class="params-note">Server params appear after Connect</span>
+        </div>
 
-    <div class="card">
-      <div id="week" class="muted">Week: --</div>
-      <div class="kpi" style="margin-top:10px">
-        <div class="pill">Trades: <b id="trades">--</b></div>
-        <div class="pill">W/L: <b id="wl">--</b></div>
-        <div class="pill">Win Rate: <b id="winrate">--</b></div>
-        <div class="pill">Gross PnL: <b id="gross">--</b></div>
-        <div class="pill">Net PnL: <b id="net">--</b></div>
-        <div class="pill">Day PnL: <b id="day">--</b></div>
-        <div class="pill">Charges: <b id="charges">--</b></div>
-        <div class="pill">Recent: <b id="recent">--</b></div>
+        <span class="lbl">Symbol:</span>
+        <div class="row-inline">
+          <input id="tradeSymbol" type="text" placeholder="NIFTY26AUG25000CE" style="min-width:240px;flex:1" />
+          <select id="baseSymbol" style="display:none" aria-hidden="true">
+            <option value="NIFTY">NIFTY</option>
+            <option value="BANKNIFTY">BANKNIFTY</option>
+            <option value="SENSEX">SENSEX</option>
+            <option value="FINNIFTY">FINNIFTY</option>
+            <option value="BANKEX">BANKEX</option>
+          </select>
+          <input id="indexLtp" type="hidden" />
+          <input id="optionType" type="hidden" value="CE" />
+        </div>
+
+        <div class="controls-row">
+          <button type="button" id="buyBtn" class="btn-buy">BUY</button>
+          <button type="button" id="exitBtn" class="btn-exit">EXIT</button>
+          <span id="autoBuyBadge" class="badge-auto">AUTO BUY: —</span>
+          <span id="autoSellBadge" class="badge-auto">AUTO SELL: —</span>
+        </div>
+
+        <div class="status-bar">
+          <span id="buyStatusLabel">Buy status: —</span>
+          <span id="positionLabel" class="flat">● NO POSITION</span>
+          <span id="momentumAlert"></span>
+          <span id="strategyLabel">Strategy: —</span>
+        </div>
+
+        <textarea id="logBox" readonly aria-label="Activity log"></textarea>
+        <div id="tradeResponse">—</div>
       </div>
-      <div class="kpi" style="margin-top:8px">
-        <div class="pill">Signal: <b id="signal">--</b></div>
-        <div class="pill">RSI/Mom: <b id="rsiMom">--</b></div>
-        <div class="pill">S/R: <b id="sr">--</b></div>
-        <div class="pill">State: <b id="marketState">--</b></div>
-      </div>
-      <div class="muted" id="updated" style="margin-top:10px">Updated: --</div>
-    </div>
+
+      <details class="web-connect" open>
+        <summary>Web connection (snapshot &amp; orders)</summary>
+        <div class="row">
+          <label for="token">API Token</label>
+          <input id="token" type="password" placeholder="WEB_API_TOKEN (optional)" style="min-width:220px" />
+          <button type="button" id="connectBtn">Connect</button>
+          <span id="status" class="muted">Disconnected</span>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <label for="indexLtpManual">Index LTP</label>
+          <input id="indexLtpManual" type="number" step="0.05" placeholder="From snapshot or type manually" style="width:180px" />
+          <span class="muted" style="font-size:11px">Used only for Suggest (not displayed as live quote)</span>
+        </div>
+        <div class="muted" style="font-size:11px;margin-top:6px">
+          <code>/api/monitor/snapshot</code> · <code>/ws/monitor</code> · <code>/api/trade/action</code>
+        </div>
+        <div id="message" class="muted">Click Connect to stream live worker data (no mock quotes).</div>
+        <div id="suggestedSymbol" class="muted" style="font-size:11px;margin-top:4px"></div>
+        <span id="tradeStatus" class="muted" style="display:none">Idle</span>
+      </details>
+    </section>
+
+    <section class="monitor-panel">
+      <h2>PnL Monitor</h2>
+      <pre id="monText">Connect to load live monitor…</pre>
+    </section>
   </div>
 
   <script>
     let ws;
     let reconnectTimer;
+    let lastToken = '';
+    let lastLogAction = '';
+    let systemTradingEnabled = null;
+    let lastRisk = null;
+
     const tokenEl = document.getElementById('token');
     const tradeSymbolEl = document.getElementById('tradeSymbol');
     const tradeLotsEl = document.getElementById('tradeLots');
@@ -125,62 +383,284 @@
     const buyBtn = document.getElementById('buyBtn');
     const exitBtn = document.getElementById('exitBtn');
     const suggestBtn = document.getElementById('suggestBtn');
-    let lastToken = '';
+    const cePeBtn = document.getElementById('cePeBtn');
+    const logBox = document.getElementById('logBox');
+    const monText = document.getElementById('monText');
+    const strikeOffsetEl = document.getElementById('strikeOffset');
+
+    (function initOffsetOptions() {
+      for (let i = -10; i <= 10; i++) {
+        const opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = i === 0 ? 'ATM' : `ATM ${i > 0 ? '+' : ''}${i}`;
+        strikeOffsetEl.appendChild(opt);
+      }
+    })();
 
     function updateCurrentDateTime() {
       const now = new Date();
-      const datePart = now.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
-      });
-      const timePart = now.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-      });
-      const el = document.getElementById('currentDateTime');
-      if (el) el.textContent = `${datePart} ${timePart}`;
+      const datePart = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      const timePart = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      document.getElementById('currentDateTime').textContent = `${datePart} ${timePart}`;
     }
 
-    function setStatus(msg, cls='muted') {
+    function setStatus(msg, cls = 'muted') {
       const el = document.getElementById('status');
       el.textContent = msg;
       el.className = cls;
     }
 
-    function setMessage(msg, cls='muted') {
-      const el = document.getElementById('message');
-      el.textContent = msg;
-      el.className = cls;
+    function setConnStatus(connected) {
+      const el = document.getElementById('connStatus');
+      el.textContent = connected ? 'Live' : 'Offline';
+      el.className = connected ? 'connected' : 'disconnected';
     }
 
-    function setTradeBusy(busy, text='Working...') {
+    function setMessage(msg, cls = 'muted') {
+      document.getElementById('message').textContent = msg;
+      document.getElementById('message').className = cls;
+    }
+
+    function setTradeBusy(busy, text = 'Working...') {
       buyBtn.disabled = busy;
       exitBtn.disabled = busy;
       tradeStatusEl.textContent = busy ? text : 'Idle';
-      tradeStatusEl.className = busy ? 'muted' : 'muted';
     }
 
-    function setTradeResult(msg, cls='muted') {
+    function setTradeResult(msg, cls = 'muted') {
       tradeResponseEl.textContent = msg;
       tradeResponseEl.className = cls;
     }
 
-    function colorize(el, val) {
-      el.classList.remove('green', 'red');
-      const n = Number(val);
-      if (n > 0) el.classList.add('green');
-      else if (n < 0) el.classList.add('red');
+    function appendLog(msg) {
+      if (!msg || msg === lastLogAction) return;
+      lastLogAction = msg;
+      const ts = new Date().toLocaleTimeString();
+      logBox.value += `[${ts}] ${msg}\n`;
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    function parseSymbolParts(symbol) {
+      const s = String(symbol || '').trim().toUpperCase();
+      let m = s.match(/^([A-Z]+?)([0-9]{6})(\d+)(CE|PE)$/);
+      if (m) {
+        const mm = parseInt(m[2].slice(2, 4), 10);
+        const dd = parseInt(m[2].slice(4, 6), 10);
+        if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+          return { base: m[1], expiry: m[2], strike: parseInt(m[3], 10), opt: m[4] };
+        }
+      }
+      m = s.match(/^([A-Z]+?)([0-9]{2}[A-Z]{3})(\d+)(CE|PE)$/);
+      if (m) return { base: m[1], expiry: m[2], strike: parseInt(m[3], 10), opt: m[4] };
+      m = s.match(/^([A-Z]+?)([0-9]{5})(\d+)(CE|PE)$/);
+      if (m) return { base: m[1], expiry: m[2], strike: parseInt(m[3], 10), opt: m[4] };
+      return null;
+    }
+
+    function detectStrikeStep(symbol) {
+      const s = String(symbol || '').toUpperCase();
+      if (s.includes('SENSEX') || s.includes('BANKEX')) return 100;
+      if (s.includes('BANKNIFTY')) return 100;
+      return 50;
+    }
+
+    function updateSymbolStrike(symbol, newStrike) {
+      const parts = parseSymbolParts(symbol);
+      if (!parts) return symbol;
+      return `${parts.base}${parts.expiry}${newStrike}${parts.opt}`;
+    }
+
+    function updateSymbolOption(symbol, opt) {
+      const s = String(symbol || '').trim().toUpperCase();
+      if (s.endsWith('CE') || s.endsWith('PE')) return s.slice(0, -2) + opt;
+      return s + opt;
+    }
+
+    function inferBaseSymbol(symbol) {
+      const s = String(symbol || '').toUpperCase();
+      if (s.includes('BANKNIFTY') || (s.includes('BANK') && s.includes('NIFTY'))) return 'BANKNIFTY';
+      if (s.includes('FINNIFTY') || s.includes('FIN')) return 'FINNIFTY';
+      if (s.includes('BANKEX')) return 'BANKEX';
+      if (s.includes('SENSEX') || s.includes('BSX')) return 'SENSEX';
+      return 'NIFTY';
+    }
+
+    function syncCePeButton() {
+      const opt = document.getElementById('optionType').value;
+      cePeBtn.textContent = opt;
+      cePeBtn.className = opt === 'PE' ? 'btn-pe' : 'btn-ce';
+    }
+
+    function strategyFromIndicator(indicator) {
+      if (!indicator) return { text: 'Strategy: —', color: '#6b7280' };
+      const sig = indicator.signal || '';
+      const sideways = indicator.sideways;
+      const exhausted = indicator.exhausted;
+      let tradeStatus = '';
+      let tradeColor = '#6b7280';
+
+      if (sig === 'BULLISH') {
+        tradeStatus = '📈 BULLISH SETUP';
+        tradeColor = '#10b981';
+      } else if (sig === 'BEARISH') {
+        tradeStatus = '📉 BEARISH SETUP';
+        tradeColor = '#10b981';
+      } else if (exhausted) {
+        tradeStatus = '⚠️ MARKET EXHAUSTED';
+        tradeColor = '#ef4444';
+      } else if (sideways) {
+        tradeStatus = `⏸️ SIDEWAYS (RSI:${indicator.rsi ?? '—'} / Mtm:${indicator.momentum ?? '—'})`;
+        tradeColor = '#f97316';
+      } else if (sig === 'NEUTRAL') {
+        tradeStatus = `⚖️ NEUTRAL (RSI:${indicator.rsi ?? '—'})`;
+        tradeColor = '#6b7280';
+      } else if (sig.includes('CONFIRMING')) {
+        tradeStatus = `⏳ ${sig}`;
+        tradeColor = '#f97316';
+      } else if (sig.includes('WAITING')) {
+        const pts = sig.split('WAITING')[1] || '';
+        tradeStatus = `⏳ WARMING UP${pts}`;
+        tradeColor = '#6b7280';
+      } else if (sig) {
+        tradeStatus = `🔍 ${sig}`;
+        tradeColor = '#ef4444';
+      } else {
+        tradeStatus = 'Waiting…';
+      }
+
+      return { text: `Strategy: ${tradeStatus}`, color: tradeColor };
+    }
+
+    function fmtNum(v, digits = 2) {
+      if (v === null || v === undefined || v === '') return null;
+      const n = Number(v);
+      if (!Number.isFinite(n)) return null;
+      return digits === 0 ? String(Math.round(n)) : n.toFixed(digits);
+    }
+
+    function buildMonitorText(data) {
+      const p = data.pnl || {};
+      const s = data.trade_stats || {};
+      const period = data.period || {};
+      const indicator = data.indicator || {};
+      const sr = indicator.sr || {};
+
+      const lines = [];
+      lines.push(`Week (Mon-Fri): ${period.week_start || '—'} to ${period.week_end || '—'}`);
+      lines.push(`Trades: ${s.no_of_trades ?? '—'}`);
+      const wr = s.win_rate != null ? `${s.win_rate}%` : '—';
+      lines.push(`W/L   : ${s.wins ?? '—'}/${s.losses ?? '—'} (${wr})`);
+      lines.push('-'.repeat(20));
+      lines.push(`Gross PnL: ${p.gross ?? '—'}`);
+      lines.push(`Net PnL  : ${p.net ?? '—'}`);
+      lines.push(`Day PnL  : ${p.day ?? '—'}`);
+      lines.push(`Charges  : ${p.charges ?? '—'}`);
+      lines.push('-'.repeat(20));
+
+      const rsi = indicator.rsi;
+      const mom = indicator.momentum;
+      lines.push(`RSI: ${rsi ?? '—'} | Mom: ${mom ?? '—'}`);
+      lines.push(`Res: ${sr.resistance ?? '—'} | Sup: ${sr.support ?? '—'}`);
+
+      const dh = sr.day_high;
+      const dl = sr.day_low;
+      if (dh != null || dl != null) {
+        lines.push(`H/L: ${dh ?? '—'} / ${dl ?? '—'}`);
+      }
+
+      const recent = (s.recent || []).join(' | ');
+      lines.push(`Recent: ${recent || '—'}`);
+
+      lines.push('-'.repeat(20));
+      lines.push('Avg/hr    : — (not in web snapshot)');
+
+      const src = indicator.index_name || data.position?.symbol || '—';
+      lines.push(`Source: ${src}`);
+      lines.push('-'.repeat(20));
+      lines.push(`Updated: ${data.timestamp || '—'}`);
+
+      if (data.last_action) {
+        lines.push(`Last: ${data.last_action}`);
+      }
+
+      return lines.join('\n');
+    }
+
+    function renderAutomation(auto) {
+      const tgt = document.getElementById('paramTgt');
+      const sl = document.getElementById('paramSl');
+      const trl = document.getElementById('paramTrl');
+      const pt = document.getElementById('paramPt');
+      const note = document.getElementById('paramsNote');
+      const ab = document.getElementById('autoBuyBadge');
+      const as = document.getElementById('autoSellBadge');
+
+      if (!auto || typeof auto !== 'object') {
+        tgt.value = '';
+        sl.value = '';
+        trl.value = '';
+        pt.value = '';
+        note.style.display = 'inline';
+        ab.textContent = 'AUTO BUY: —';
+        as.textContent = 'AUTO SELL: —';
+        ab.classList.remove('on');
+        as.classList.remove('on');
+        return;
+      }
+
+      note.style.display = 'none';
+      tgt.value = auto.target ?? '';
+      sl.value = auto.sl ?? '';
+      trl.value = auto.trail_step ?? '';
+      pt.value = auto.profit_trail_step ?? '';
+
+      const buyOn = !!auto.auto_buy_enabled;
+      const sellOn = !!auto.auto_sell_enabled;
+      ab.textContent = `AUTO BUY: ${buyOn ? 'ON' : 'OFF'}`;
+      as.textContent = `AUTO SELL: ${sellOn ? 'ON' : 'OFF'}`;
+      ab.classList.toggle('on', buyOn);
+      as.classList.toggle('on', sellOn);
+    }
+
+    function renderRisk(risk, systemTrading) {
+      const el = document.getElementById('buyStatusLabel');
+      if (systemTrading === false) {
+        el.textContent = 'Buy Disabled — TRADING_ENABLED=false';
+        el.className = 'red';
+        return;
+      }
+      if (!risk || typeof risk !== 'object') {
+        el.textContent = 'Buy status: —';
+        el.className = 'muted';
+        return;
+      }
+      if (risk.buy_allowed === true) {
+        el.textContent = 'Buy Enabled';
+        el.className = 'green';
+      } else if (risk.buy_allowed === false) {
+        const why = risk.reason || (risk.cooloff_remaining ? `cooloff ${risk.cooloff_remaining}s` : 'locked');
+        el.textContent = `Buy Disabled — ${why}`;
+        el.className = 'red';
+      } else {
+        el.textContent = 'Buy status: —';
+        el.className = 'muted';
+      }
     }
 
     function render(payload) {
+      if (payload && payload.warming_up && !payload.data) {
+        setMessage(payload.message || 'Worker is warming up…', 'muted');
+        monText.textContent = payload.message || 'Waiting for worker snapshot…';
+        setConnStatus(false);
+        return;
+      }
+
       const data = payload.data ? payload.data : payload;
       if (!data) return;
 
       if (data.warming_up || data.status === 'warming_up') {
-        setMessage(data.message || 'Worker is warming up...', 'muted');
+        setMessage(data.message || 'Worker is warming up…', 'muted');
+        monText.textContent = data.message || 'Warming up…';
         return;
       }
 
@@ -190,95 +670,67 @@
         setMessage('Worker snapshot is stale. Check worker process.', 'red');
       } else {
         setMessage('Live data stream active.', 'green');
+        setConnStatus(true);
       }
 
-      const p = data.pnl || {};
-      const s = data.trade_stats || {};
-      const period = data.period || {};
+      monText.textContent = buildMonitorText(data);
+
       const indicator = data.indicator || {};
       const risk = data.risk || {};
       const position = data.position || {};
+      const idxLive = document.getElementById('indexLtpLive');
 
-      document.getElementById('week').textContent = `Week: ${period.week_start || '--'} to ${period.week_end || '--'}`;
-      document.getElementById('trades').textContent = s.no_of_trades ?? '--';
-      document.getElementById('wl').textContent = `${s.wins ?? '--'}/${s.losses ?? '--'}`;
-      document.getElementById('winrate').textContent = `${s.win_rate ?? '--'}%`;
-
-      const grossEl = document.getElementById('gross');
-      const netEl = document.getElementById('net');
-      const dayEl = document.getElementById('day');
-      const chargesEl = document.getElementById('charges');
-
-      grossEl.textContent = p.gross ?? '--';
-      netEl.textContent = p.net ?? '--';
-      dayEl.textContent = p.day ?? '--';
-      chargesEl.textContent = p.charges ?? '--';
-      document.getElementById('recent').textContent = (s.recent || []).join(' | ') || '--';
-
-      colorize(grossEl, p.gross);
-      colorize(netEl, p.net);
-      colorize(dayEl, p.day);
-
-      document.getElementById('updated').textContent = `Updated: ${data.timestamp || new Date().toISOString()}`;
-
-      document.getElementById('signal').textContent = indicator.signal || '--';
-      document.getElementById('rsiMom').textContent = `${indicator.rsi ?? '--'} / ${indicator.momentum ?? '--'}`;
-      const sr = indicator.sr || {};
-      document.getElementById('sr').textContent = `${sr.support ?? '--'} / ${sr.resistance ?? '--'}`;
-      let mState = 'NORMAL';
-      if (indicator.exhausted) mState = 'EXHAUSTED';
-      else if (indicator.sideways) mState = 'SIDEWAYS';
-      document.getElementById('marketState').textContent = mState;
-
-      const riskEl = document.getElementById('riskState');
-      if (risk.buy_allowed === true) {
-        riskEl.textContent = 'BUY ALLOWED';
-        riskEl.className = 'green';
-      } else if (risk.buy_allowed === false) {
-        const why = risk.reason || (risk.cooloff_remaining ? `cooloff ${risk.cooloff_remaining}s` : 'locked');
-        riskEl.textContent = `BLOCKED (${why})`;
-        riskEl.className = 'red';
-      } else {
-        riskEl.textContent = '--';
-        riskEl.className = 'muted';
-      }
-
-      const posEl = document.getElementById('positionState');
-      if (position && position.symbol) {
-        posEl.textContent = `${position.symbol} (${position.qty}) @ ${position.entry_price ?? '--'}`;
-        posEl.className = 'red';
-      } else {
-        posEl.textContent = 'NO POSITION';
-        posEl.className = 'green';
-      }
-
-      if (!document.getElementById('indexLtp').value && indicator.index_ltp) {
+      if (indicator.index_ltp != null && Number(indicator.index_ltp) > 0) {
+        const name = indicator.index_name ? `${indicator.index_name} ` : '';
+        idxLive.textContent = `${name}LTP ${Number(indicator.index_ltp).toFixed(2)} (snapshot)`;
         document.getElementById('indexLtp').value = indicator.index_ltp;
+        const manual = document.getElementById('indexLtpManual');
+        if (manual && !manual.matches(':focus')) manual.value = indicator.index_ltp;
+        document.getElementById('baseSymbol').value = inferBaseSymbol(indicator.index_name || tradeSymbolEl.value);
+      } else {
+        idxLive.textContent = 'Index LTP: — (enter manually for Suggest)';
+      }
+
+      renderAutomation(data.automation);
+      lastRisk = risk;
+      renderRisk(risk, systemTradingEnabled);
+
+      const posEl = document.getElementById('positionLabel');
+      if (position && position.symbol) {
+        posEl.textContent = `● POSITION OPEN — ${position.symbol} (${position.qty}) @ ${position.entry_price ?? '—'}`;
+        posEl.className = 'open';
+      } else {
+        posEl.textContent = '● NO POSITION';
+        posEl.className = 'flat';
+      }
+
+      const strat = strategyFromIndicator(indicator);
+      const stratEl = document.getElementById('strategyLabel');
+      stratEl.textContent = strat.text;
+      stratEl.style.color = strat.color;
+
+      const mom = Number(indicator.momentum);
+      const momAlert = document.getElementById('momentumAlert');
+      if (Number.isFinite(mom) && Math.abs(mom) >= 20) {
+        momAlert.textContent = ` 🔥 ${mom > 0 ? '+' : ''}${mom.toFixed(2)} 🔥 `;
+        momAlert.classList.add('show');
+      } else {
+        momAlert.textContent = '';
+        momAlert.classList.remove('show');
+      }
+
+      if (data.last_action) {
+        appendLog(data.last_action);
       }
     }
 
     function renderSystemStatus(status) {
       if (!status) return;
-      const te = document.getElementById('tradingEnabled');
-      const wh = document.getElementById('workerHealth');
       const ip = document.getElementById('serverIp');
+      ip.textContent = status.server_ip || '—';
 
-      te.textContent = status.trading_enabled ? 'YES' : 'NO';
-      te.className = status.trading_enabled ? 'green' : 'red';
-
-      if (status.worker_healthy === true) {
-        wh.textContent = 'HEALTHY';
-        wh.className = 'green';
-      } else if (status.worker_healthy === false) {
-        wh.textContent = 'UNHEALTHY';
-        wh.className = 'red';
-      } else {
-        wh.textContent = '--';
-        wh.className = 'muted';
-      }
-
-      ip.textContent = status.server_ip || '--';
-      ip.className = 'green';
+      systemTradingEnabled = status.trading_enabled;
+      renderRisk(lastRisk, systemTradingEnabled);
     }
 
     async function loadSnapshot(token) {
@@ -356,13 +808,14 @@
 
     async function suggestSymbol() {
       const token = tokenEl.value.trim();
-      const base_symbol = document.getElementById('baseSymbol').value;
+      const base_symbol = inferBaseSymbol(tradeSymbolEl.value || document.getElementById('baseSymbol').value);
+      document.getElementById('baseSymbol').value = base_symbol;
       const option_type = document.getElementById('optionType').value;
-      const index_ltp = Number(document.getElementById('indexLtp').value || '0');
-      const offset = Number(document.getElementById('strikeOffset').value || '0');
+      const index_ltp = Number(document.getElementById('indexLtp').value || document.getElementById('indexLtpManual').value || '0');
+      const offset = Number(strikeOffsetEl.value || '0');
 
       if (!Number.isFinite(index_ltp) || index_ltp <= 0) {
-        document.getElementById('suggestedSymbol').textContent = 'Suggested Symbol: enter valid index LTP';
+        document.getElementById('suggestedSymbol').textContent = 'Suggest: need index LTP from snapshot or worker live';
         document.getElementById('suggestedSymbol').className = 'red';
         return;
       }
@@ -376,15 +829,15 @@
         const j = await r.json().catch(() => ({}));
         if (!r.ok) {
           const d = j?.detail || `Suggestion failed (${r.status})`;
-          document.getElementById('suggestedSymbol').textContent = `Suggested Symbol: ${d}`;
+          document.getElementById('suggestedSymbol').textContent = `Suggest: ${d}`;
           document.getElementById('suggestedSymbol').className = 'red';
           return;
         }
-        document.getElementById('suggestedSymbol').textContent = `Suggested Symbol: ${j.symbol}`;
+        document.getElementById('suggestedSymbol').textContent = `Suggested: ${j.symbol}`;
         document.getElementById('suggestedSymbol').className = 'green';
         tradeSymbolEl.value = j.symbol;
       } catch (e) {
-        document.getElementById('suggestedSymbol').textContent = `Suggested Symbol: ${String(e?.message || e)}`;
+        document.getElementById('suggestedSymbol').textContent = `Suggest: ${String(e?.message || e)}`;
         document.getElementById('suggestedSymbol').className = 'red';
       }
     }
@@ -405,9 +858,13 @@
       const q = token ? `?token=${encodeURIComponent(token)}` : '';
       ws = new WebSocket(`${proto}://${location.host}/ws/monitor${q}`);
 
-      ws.onopen = () => setStatus('Connected', 'green');
+      ws.onopen = () => {
+        setStatus('Connected', 'green');
+        setConnStatus(true);
+      };
       ws.onclose = () => {
         setStatus('Disconnected', 'red');
+        setConnStatus(false);
         scheduleReconnect();
       };
       ws.onerror = () => setStatus('WS Error', 'red');
@@ -426,6 +883,7 @@
       } catch (e) {
         setStatus(String(e.message || e), 'red');
         setMessage('Connection failed. Check token and worker status.', 'red');
+        setConnStatus(false);
       }
     });
 
@@ -433,8 +891,40 @@
     exitBtn.addEventListener('click', () => executeTrade('EXIT'));
     suggestBtn.addEventListener('click', suggestSymbol);
 
+    cePeBtn.addEventListener('click', () => {
+      const optEl = document.getElementById('optionType');
+      const next = optEl.value === 'CE' ? 'PE' : 'CE';
+      optEl.value = next;
+      syncCePeButton();
+      const cur = tradeSymbolEl.value.trim();
+      if (cur) tradeSymbolEl.value = updateSymbolOption(cur, next);
+    });
+
+    document.getElementById('strikeUp').addEventListener('click', () => {
+      const cur = tradeSymbolEl.value.trim();
+      if (!cur) return;
+      const step = detectStrikeStep(cur);
+      const parts = parseSymbolParts(cur);
+      if (!parts) return;
+      tradeSymbolEl.value = updateSymbolStrike(cur, parts.strike + step);
+    });
+
+    document.getElementById('strikeDown').addEventListener('click', () => {
+      const cur = tradeSymbolEl.value.trim();
+      if (!cur) return;
+      const step = detectStrikeStep(cur);
+      const parts = parseSymbolParts(cur);
+      if (!parts || parts.strike - step <= 0) return;
+      tradeSymbolEl.value = updateSymbolStrike(cur, parts.strike - step);
+    });
+
+    strikeOffsetEl.addEventListener('change', () => {
+      if (Number(document.getElementById('indexLtp').value) > 0) suggestSymbol();
+    });
+
     const saved = localStorage.getItem('neo_web_token') || '';
     tokenEl.value = saved;
+    syncCePeButton();
     updateCurrentDateTime();
     setInterval(updateCurrentDateTime, 1000);
   </script>
