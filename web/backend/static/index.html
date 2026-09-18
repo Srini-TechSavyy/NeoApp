@@ -278,11 +278,13 @@
       grid-column: 1 / -1;
       width: 100%;
       min-width: 0;
+      max-width: 100%;
       font-size: 11px;
+      line-height: 1.45;
       margin-top: 2px;
       padding-left: 68px;
       overflow-wrap: anywhere;
-      white-space: pre-wrap;
+      white-space: normal;
       word-break: break-word;
       color: var(--muted);
     }
@@ -1110,6 +1112,59 @@
       return token ? { 'Content-Type': 'application/json', 'X-API-Key': token } : { 'Content-Type': 'application/json' };
     }
 
+    function formatTradeOrderResponse(action, payload) {
+      const broker = payload?.broker_response && typeof payload.broker_response === 'object'
+        ? payload.broker_response
+        : {};
+      const raw = broker.raw && typeof broker.raw === 'object' ? broker.raw : {};
+
+      const orderId = broker.order_id ?? broker.nOrdNo ?? raw.nOrdNo ?? raw.order_id;
+      const orderIdStr = orderId != null && String(orderId).trim() !== '' ? String(orderId) : '—';
+
+      const statusRaw = broker.status ?? raw.ordSt ?? raw.stat ?? raw.status ?? '';
+      const statusNorm = String(statusRaw).toLowerCase().trim();
+      const rejected = statusNorm === 'rejected' || statusNorm === 'reject';
+
+      const symbol = String(broker.symbol || payload?.trading_symbol || '').trim();
+      const lots = broker.lots ?? payload?.lots;
+
+      if (rejected) {
+        const reqLabel = action === 'EXIT' ? 'EXIT request rejected' : `${action} request rejected`;
+        const brokerStatus = statusNorm || 'rejected';
+        return {
+          message: `${reqLabel} | Order ID: ${orderIdStr} | Broker status: ${brokerStatus}`,
+          cls: 'red',
+          rejected: true,
+        };
+      }
+
+      const chunks = [];
+      if (action === 'EXIT') {
+        chunks.push('Order response received: EXIT');
+      } else {
+        let head = 'Order response received: BUY';
+        if (symbol) head += ` ${symbol}`;
+        chunks.push(head);
+      }
+      chunks.push(`Order ID: ${orderIdStr}`);
+
+      if (statusNorm && statusNorm !== 'unknown') {
+        chunks.push(`Status: ${statusRaw}`);
+      }
+      const execPrice = broker.execution_price;
+      if (execPrice != null && execPrice !== '' && Number.isFinite(Number(execPrice)) && Number(execPrice) > 0) {
+        chunks.push(`Exec: ${execPrice}`);
+      }
+      if (action === 'BUY' && Number.isFinite(lots) && lots >= 1) {
+        chunks.push(`Lots: ${lots}`);
+      }
+
+      const completed = broker.completed === true || statusNorm === 'complete';
+      const cls = completed ? 'green' : (statusNorm ? 'muted' : 'green');
+
+      return { message: chunks.join(' | '), cls, rejected: false, completed };
+    }
+
     async function executeTrade(action) {
       const token = tokenEl.value.trim();
       const trading_symbol = tradeSymbolEl.value.trim().toUpperCase();
@@ -1143,10 +1198,20 @@
           return;
         }
 
-        const broker = payload?.broker_response ? JSON.stringify(payload.broker_response, null, 2) : '{}';
-        setTradeResult(`Order accepted (${action}).\n${broker}`, 'green');
-        tradeStatusEl.textContent = 'Success';
-        tradeStatusEl.className = 'green';
+        console.debug('[trade/action] response', { action, payload });
+
+        const summary = formatTradeOrderResponse(action, payload);
+        setTradeResult(summary.message, summary.cls);
+        if (summary.rejected) {
+          tradeStatusEl.textContent = 'Rejected';
+          tradeStatusEl.className = 'red';
+        } else if (summary.completed) {
+          tradeStatusEl.textContent = 'Success';
+          tradeStatusEl.className = 'green';
+        } else {
+          tradeStatusEl.textContent = 'Submitted';
+          tradeStatusEl.className = 'muted';
+        }
       } catch (e) {
         setTradeResult(`Order error: ${String(e?.message || e)}`, 'red');
         tradeStatusEl.textContent = 'Failed';
