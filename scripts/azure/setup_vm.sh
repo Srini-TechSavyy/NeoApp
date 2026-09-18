@@ -43,51 +43,32 @@ sudo cp "$REPO_ROOT/deploy/systemd/neo-fastapi.service" /etc/systemd/system/neo-
 sudo cp "$REPO_ROOT/deploy/systemd/neo-worker.service" /etc/systemd/system/neo-worker.service
 
 echo "[5/9] Installing Nginx HTTP site (TLS after certificate)"
-sudo tee /etc/nginx/sites-available/neoapp2 >/dev/null <<NGINX
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${DOMAIN};
-
-    location /.well-known/acme-challenge/ {
-        root /var/www/html;
-    }
-
-    location /ws/monitor {
-        proxy_pass http://127.0.0.1:8000/ws/monitor;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 300s;
-        proxy_buffering off;
-    }
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_read_timeout 300s;
-    }
-}
-NGINX
+sudo sed "s/__SERVER_NAME__/$DOMAIN/g" "$REPO_ROOT/deploy/nginx/neoapp2.http.conf" \
+  | sudo tee /etc/nginx/sites-available/neoapp2 >/dev/null
 sudo ln -sfn /etc/nginx/sites-available/neoapp2 /etc/nginx/sites-enabled/neoapp2
 sudo rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/neoapp
 sudo mkdir -p /var/www/html
 sudo nginx -t
 sudo systemctl reload nginx
 
-echo "[6/9] Requesting TLS certificate"
-sudo certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$LE_EMAIL" --redirect
-sudo sed "s/__SERVER_NAME__/$DOMAIN/g" "$REPO_ROOT/deploy/nginx/neoapp2.conf" \
-  | sudo tee /etc/nginx/sites-available/neoapp2 >/dev/null
-sudo nginx -t
-sudo systemctl reload nginx
+echo "[6/9] Requesting TLS certificate (only if DNS points at this VM)"
+PUBLIC_IP="$(curl -fsS --max-time 8 https://api.ipify.org || curl -fsS --max-time 8 https://ifconfig.me || true)"
+RESOLVED_IPS="$(getent ahostsv4 "$DOMAIN" 2>/dev/null | awk '{print $1}' | sort -u | tr '\n' ' ')"
+echo "VM public IPv4: ${PUBLIC_IP:-unknown}"
+echo "DNS A for $DOMAIN: ${RESOLVED_IPS:-none}"
+if [[ -n "${PUBLIC_IP:-}" ]] && echo " ${RESOLVED_IPS} " | grep -q " ${PUBLIC_IP} "; then
+  sudo certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$LE_EMAIL" --redirect
+  sudo sed "s/__SERVER_NAME__/$DOMAIN/g" "$REPO_ROOT/deploy/nginx/neoapp2.conf" \
+    | sudo tee /etc/nginx/sites-available/neoapp2 >/dev/null
+  sudo nginx -t
+  sudo systemctl reload nginx
+else
+  echo "Skipping Certbot: $DOMAIN does not resolve to this VM public IP."
+  echo "Create an A record: $DOMAIN -> ${PUBLIC_IP:-<vm-public-ip>} (DNS only, not a CDN proxy)."
+  echo "Then run: sudo certbot --nginx -d $DOMAIN --agree-tos -m $LE_EMAIL --redirect"
+  echo "After a certificate exists: sudo sed 's/__SERVER_NAME__/$DOMAIN/g' $REPO_ROOT/deploy/nginx/neoapp2.conf | sudo tee /etc/nginx/sites-available/neoapp2"
+  echo "Then: sudo nginx -t && sudo systemctl reload nginx"
+fi
 
 echo "[7/9] Runtime environment file template"
 if [[ ! -f "$ENV_DIR/neoapp.env" ]]; then
@@ -116,12 +97,16 @@ Next steps:
   3. Register a self-hosted GitHub Actions runner on this VM with labels:
        self-hosted, linux, x64, neoapp2
 
-  4. Allow the runner user passwordless systemctl (replace RUNNER_USER):
+  4. Grant the runner user write access to $APP_DIR (replace RUNNER_USER):
+       $REPO_ROOT/scripts/azure/grant_runner_deploy_access.sh RUNNER_USER
+     Then restart the runner service.
+
+  5. Allow the runner user passwordless systemctl (replace RUNNER_USER):
        sudo visudo -f /etc/sudoers.d/neoapp-deploy
      Example:
-       RUNNER_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart neo-worker.service, /usr/bin/systemctl restart neo-fastapi.service, /usr/bin/systemctl reload nginx, /usr/bin/systemctl status neo-worker.service, /usr/bin/systemctl status neo-fastapi.service
+       RUNNER_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart neo-worker.service, /usr/bin/systemctl restart neo-fastapi.service, /usr/bin/systemctl reload nginx, /usr/bin/systemctl status neo-worker.service, /usr/bin/systemctl status neo-fastapi.service, /usr/sbin/nginx
 
-  5. Deploy via GitHub Actions workflow "Deploy to Azure VM", then:
+  6. Deploy via GitHub Actions workflow "Deploy to Azure VM", then:
        sudo systemctl restart neo-worker.service neo-fastapi.service
 
 Verification:

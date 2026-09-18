@@ -30,6 +30,20 @@ jobs:
           set -euo pipefail
 
           APP_DIR="/opt/neoapp2"
+          echo "Deploy user: $(whoami)  id: $(id)"
+          ls -ld "$APP_DIR" "$APP_DIR/releases" 2>/dev/null || true
+
+          if [[ ! -d "$APP_DIR" ]]; then
+            echo "::error::$APP_DIR does not exist. Run scripts/azure/setup_vm.sh on the VM first."
+            exit 1
+          fi
+
+          if [[ ! -w "$APP_DIR" ]] || { [[ -e "$APP_DIR/releases" ]] && [[ ! -w "$APP_DIR/releases" ]]; }; then
+            echo "::error::User $(whoami) cannot write $APP_DIR. On the VM: sudo apt-get install -y acl && sudo setfacl -R -m u:$(whoami):rwx $APP_DIR && sudo setfacl -R -d -m u:$(whoami):rwx $APP_DIR"
+            ls -ld "$APP_DIR" "$APP_DIR/releases" || true
+            exit 1
+          fi
+
           RELEASE_ID="$(date +%Y%m%d%H%M%S)-${GITHUB_RUN_ID}"
           RELEASE_DIR="$APP_DIR/releases/$RELEASE_ID"
           PREVIOUS_RELEASE=""
@@ -131,7 +145,7 @@ jobs:
 
           sudo -n /usr/bin/systemctl restart neo-worker.service
           sudo -n /usr/bin/systemctl restart neo-fastapi.service
-          sudo -n /usr/bin/nginx -t
+          sudo -n /usr/sbin/nginx -t
           sudo -n /usr/bin/systemctl reload nginx
 
           echo "Services restarted."

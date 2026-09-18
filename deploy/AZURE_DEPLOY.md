@@ -90,6 +90,29 @@ Only after completing the validation checklist below, set `TRADING_ENABLED=true`
 2. Install and start the runner on the **same VM**.
 3. Add labels: `self-hosted`, `linux`, `x64`, `neoapp2` (must match [.github/workflows/deploy-azure-vm.yml](../.github/workflows/deploy-azure-vm.yml)).
 
+### Write access to `/opt/neoapp2`
+
+`setup_vm.sh` owns `/opt/neoapp2` as user `neoapp`. The Actions runner is usually a **different** Linux user, so the Prepare release step fails with `mkdir: cannot create directory ‘/opt/neoapp2/releases/…’: Permission denied` until you grant group write.
+
+Adding the runner to group `neoapp` is **not enough** until the runner **process** is restarted. Re-running the failed GitHub job uses the same long-lived `Runner.Listener`, which still has the old groups.
+
+On the VM, apply an ACL (takes effect immediately). Detect the **process owner**, not SSH `whoami`:
+
+```bash
+ps -o user= -C Runner.Listener
+ls -ld /opt/neoapp2 /opt/neoapp2/releases
+
+sudo apt-get install -y acl
+RUNNER_USER="$(ps -o user= -C Runner.Listener | awk '{print $1}' | head -1)"
+echo "Granting ACL to: $RUNNER_USER"
+sudo mkdir -p /opt/neoapp2/releases
+sudo setfacl -R -m "u:${RUNNER_USER}:rwx" /opt/neoapp2
+sudo setfacl -R -d -m "u:${RUNNER_USER}:rwx" /opt/neoapp2
+sudo -u "$RUNNER_USER" mkdir -p /opt/neoapp2/releases/_permcheck && sudo rmdir /opt/neoapp2/releases/_permcheck
+```
+
+Or run `scripts/azure/grant_runner_deploy_access.sh` (auto-detects `Runner.Listener`). Then re-run the workflow.
+
 ### Passwordless sudo for deploy
 
 The workflow runs `sudo -n systemctl` and `nginx -t`. Grant the **runner user** (not necessarily `neoapp`):
@@ -99,7 +122,7 @@ sudo visudo -f /etc/sudoers.d/neoapp-deploy
 ```
 
 ```
-RUNNER_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart neo-worker.service, /usr/bin/systemctl restart neo-fastapi.service, /usr/bin/systemctl reload nginx, /usr/bin/systemctl status neo-worker.service, /usr/bin/systemctl status neo-fastapi.service, /usr/bin/nginx
+RUNNER_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart neo-worker.service, /usr/bin/systemctl restart neo-fastapi.service, /usr/bin/systemctl reload nginx, /usr/bin/systemctl status neo-worker.service, /usr/bin/systemctl status neo-fastapi.service, /usr/sbin/nginx
 ```
 
 Replace `RUNNER_USER` with `whoami` on the runner account.
@@ -137,7 +160,22 @@ journalctl -u neo-fastapi -n 100 --no-pager
 
 ## 6) Nginx and HTTPS
 
-Site file: [deploy/nginx/neoapp2.conf](nginx/neoapp2.conf). After manual edits:
+HTTP template (port 80, WebSocket `/ws/monitor`): [deploy/nginx/neoapp2.http.conf](nginx/neoapp2.http.conf).
+
+TLS template (after Let's Encrypt): [deploy/nginx/neoapp2.conf](nginx/neoapp2.conf).
+
+Production hostname: **`neo.techsavyy.com`**. FastAPI stays on `127.0.0.1:8000`. Do not open NSG port **8000**.
+
+On an already-bootstrapped VM, add the HTTP vhost without touching systemd or `neoapp.env`:
+
+```bash
+chmod +x scripts/azure/configure_custom_domain.sh
+./scripts/azure/configure_custom_domain.sh neo.techsavyy.com <letsencrypt-email>
+```
+
+The script runs `sudo nginx -t` and reloads Nginx only if the test succeeds. It **does not** call Certbot unless public DNS for the name includes this VM's public IPv4.
+
+After manual Nginx edits:
 
 ```bash
 sudo nginx -t
@@ -146,6 +184,24 @@ sudo certbot certificates
 ```
 
 Certbot renewal is typically via systemd timer (`certbot renew`).
+
+### Custom domain DNS (required before origin certificates)
+
+`neo.techsavyy.com` must resolve to the VM public IPv4 (currently `172.198.69.28`). If Cloudflare (or another proxy) answers with CDN IPs, Let's Encrypt HTTP-01 on the VM must wait until the public A record is the VM address (Cloudflare **DNS only** / grey cloud), or use a DNS-01 flow separately.
+
+```bash
+dig +short neo.techsavyy.com A
+# expected: 172.198.69.28
+```
+
+Then:
+
+```bash
+sudo certbot --nginx -d neo.techsavyy.com --agree-tos -m <letsencrypt-email> --redirect
+sudo sed 's/__SERVER_NAME__/neo.techsavyy.com/g' deploy/nginx/neoapp2.conf \
+  | sudo tee /etc/nginx/sites-available/neo.techsavyy.com >/dev/null
+sudo nginx -t && sudo systemctl reload nginx
+```
 
 ---
 
@@ -238,6 +294,8 @@ curl -fsS http://127.0.0.1:8000/health
 | Worker stale / empty snapshot | Neo login failure; check credentials in `neoapp.env` and worker logs |
 | Symbol not found | Missing or outdated CSV in `shared/assets/` |
 | pip install fails on deploy | Install `git` and `build-essential`; network to GitHub for Neo API package |
+| `mkdir … /opt/neoapp2/releases: Permission denied` | Runner user cannot write app dir; run `scripts/azure/grant_runner_deploy_access.sh` and restart the runner |
+| `sudo: /usr/bin/nginx: command not found` | Ubuntu nginx is `/usr/sbin/nginx`. Update sudoers and workflow to that path; or `sudo ln -sf /usr/sbin/nginx /usr/bin/nginx` to unblock the old workflow |
 | sudo password prompt in Actions | Fix `/etc/sudoers.d/neoapp-deploy` for runner user |
 | WebSocket drops | Confirm Nginx `/ws/monitor` block; `proxy_buffering off` |
 
@@ -261,5 +319,7 @@ Record results here after running bootstrap + workflow on **your** Azure VM. Loc
 - Workflow: [.github/workflows/deploy-azure-vm.yml](../.github/workflows/deploy-azure-vm.yml)
 - Bootstrap: [scripts/azure/setup_vm.sh](../scripts/azure/setup_vm.sh)
 - Env template: [deploy/env.example](env.example)
-- Nginx: [deploy/nginx/neoapp2.conf](nginx/neoapp2.conf)
+- Nginx HTTP: [deploy/nginx/neoapp2.http.conf](nginx/neoapp2.http.conf)
+- Nginx TLS: [deploy/nginx/neoapp2.conf](nginx/neoapp2.conf)
+- Custom domain helper: [scripts/azure/configure_custom_domain.sh](../scripts/azure/configure_custom_domain.sh)
 - Systemd: [deploy/systemd/neo-fastapi.service](systemd/neo-fastapi.service), [deploy/systemd/neo-worker.service](systemd/neo-worker.service)

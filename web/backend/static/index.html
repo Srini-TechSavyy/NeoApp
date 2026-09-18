@@ -6,165 +6,191 @@
   <title>SCALPER &amp; MONITOR PRO</title>
   <style>
     :root {
-      --bg: #f5f5f5;
+      --bg: #eef1f6;
       --panel: #ffffff;
-      --text: #1f2937;
-      --muted: #6b7280;
-      --border: #d1d5db;
-      --mono-bg: #111827;
-      --mono-fg: #e5e7eb;
+      --text: #1a2332;
+      --muted: #64748b;
+      --border: #d8dee8;
+      --navy: #0f2744;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --buy: #15803d;
+      --exit: #dc2626;
+      --amber: #b45309;
+      --amber-bg: #fff7ed;
+      --amber-border: #fdba74;
+      --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 6px 16px rgba(15, 23, 42, 0.05);
+      --mono-bg: #f7f9fc;
+      --mono-fg: #1e293b;
+      --control-h: 30px;
     }
     * { box-sizing: border-box; }
     body {
-      font-family: "Segoe UI", Inter, Arial, sans-serif;
+      font-family: "Segoe UI", Inter, "Helvetica Neue", Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
       margin: 0;
       min-height: 100vh;
-      font-size: 14px;
+      font-size: 13px;
+      line-height: 1.35;
     }
     .top-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 6px 10px;
-      background: var(--bg);
+      padding: 8px 16px;
+      background: var(--panel);
       border-bottom: 1px solid var(--border);
-      flex-wrap: wrap;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.8);
     }
     .top-bar h1 {
       margin: 0;
-      font-size: 15px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
+      font-size: 14px;
+      font-weight: 750;
+      letter-spacing: 0.04em;
+      color: var(--navy);
     }
     .top-meta {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 16px;
       font-size: 12px;
       font-weight: 600;
-      color: #374151;
+      color: var(--muted);
     }
-    #serverIp { color: #059669; }
-    #connStatus.disconnected { color: #dc2626; }
-    #connStatus.connected { color: #059669; }
+    #serverIp { color: var(--buy); }
+    #connStatus.disconnected { color: var(--exit); }
+    #connStatus.connected { color: var(--buy); }
 
     .main-container {
-      display: flex;
-      gap: 10px;
-      padding: 6px;
-      align-items: stretch;
-      max-width: 1100px;
+      padding: 10px 12px;
+      max-width: 720px;
       margin: 0 auto;
-    }
-    @media (max-width: 860px) {
-      .main-container { flex-direction: column; }
     }
 
     .scalper-panel {
-      flex: 1 1 520px;
-      background: var(--bg);
-      padding: 6px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 12px 14px 10px;
       min-width: 0;
     }
-    .monitor-panel {
-      flex: 0 1 340px;
-      background: var(--panel);
-      border: 2px groove #cbd5e1;
-      padding: 8px;
-      min-width: 280px;
-      display: flex;
-      flex-direction: column;
-    }
-    .monitor-panel h2 {
-      margin: 0 0 6px;
-      font-size: 13px;
-      text-align: center;
-    }
+
     #monText {
-      flex: 1;
-      margin: 0;
-      min-height: 260px;
-      background: var(--mono-bg);
-      color: var(--mono-fg);
-      font-family: Consolas, "Courier New", monospace;
-      font-size: 11px;
-      line-height: 1.45;
-      padding: 8px;
-      border-radius: 4px;
-      overflow: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
+      display: none;
     }
 
     .form-grid {
       display: grid;
-      grid-template-columns: 72px 1fr;
-      gap: 6px 8px;
+      grid-template-columns: 68px 1fr;
+      gap: 8px 10px;
       align-items: center;
     }
     .form-grid .lbl {
       text-align: right;
-      color: var(--text);
-      padding-right: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      padding-right: 2px;
     }
     .row-inline {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
     }
     input, select, button {
       font: inherit;
       border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 5px 8px;
+      border-radius: 5px;
+      padding: 0 9px;
+      height: var(--control-h);
       background: #fff;
       color: var(--text);
     }
-    button { cursor: pointer; }
-    button:disabled { opacity: 0.55; cursor: not-allowed; }
-
-    .btn-sm { padding: 3px 8px; min-width: 28px; }
-    .btn-buy {
-      background: #d1fae5;
-      font-weight: 700;
-      min-width: 88px;
+    input:focus, select:focus, button:focus-visible {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
     }
-    .btn-buy:hover:not(:disabled) { background: #a7f3d0; }
-    .btn-exit {
-      background: #fee2e2;
-      font-weight: 700;
-      min-width: 88px;
-    }
-    .btn-exit:hover:not(:disabled) { background: #fecaca; }
-    .btn-ce { background: #e6f4ea; color: #166534; min-width: 72px; font-weight: 600; }
-    .btn-pe { background: #fdecea; color: #991b1b; min-width: 72px; font-weight: 600; }
-    .badge-auto {
-      display: inline-block;
-      padding: 5px 10px;
-      border-radius: 4px;
-      background: #fef9c3;
-      border: 1px solid #fde047;
-      font-size: 12px;
+    button {
+      cursor: pointer;
       font-weight: 600;
-      color: #713f12;
+      background: #f8fafc;
+      color: var(--navy);
     }
-    .badge-auto.on { background: #4ade80; border-color: #22c55e; color: #14532d; }
+    button:hover:not(:disabled) { background: #eef2f7; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-sm { min-width: 30px; padding: 0; }
+    .btn-buy {
+      background: var(--buy);
+      border-color: #166534;
+      color: #fff;
+      font-weight: 750;
+      letter-spacing: 0.06em;
+      min-width: 96px;
+      height: 34px;
+    }
+    .btn-buy:hover:not(:disabled) { background: #166534; }
+    .btn-exit {
+      background: var(--exit);
+      border-color: #b91c1c;
+      color: #fff;
+      font-weight: 750;
+      letter-spacing: 0.06em;
+      min-width: 96px;
+      height: 34px;
+    }
+    .btn-exit:hover:not(:disabled) { background: #b91c1c; }
+    .btn-ce {
+      background: #ecfdf3;
+      color: #166534;
+      border-color: #86efac;
+      min-width: 76px;
+      font-weight: 700;
+    }
+    .btn-pe {
+      background: #fef2f2;
+      color: #991b1b;
+      border-color: #fca5a5;
+      min-width: 76px;
+      font-weight: 700;
+    }
+    .badge-auto {
+      display: inline-flex;
+      align-items: center;
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: var(--amber-bg);
+      border: 1px solid var(--amber-border);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: var(--amber);
+    }
+    .badge-auto.on {
+      background: #ecfdf3;
+      border-color: #86efac;
+      color: #166534;
+    }
 
     .params-readonly {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 6px;
+      gap: 6px 8px;
     }
-    .params-readonly label { font-size: 12px; color: var(--muted); }
+    .params-readonly label { font-size: 11px; color: var(--muted); font-weight: 600; }
     .params-readonly input {
       width: 52px;
       text-align: center;
-      background: #f9fafb;
+      background: #f8fafc;
+      color: var(--navy);
+      font-variant-numeric: tabular-nums;
     }
     .params-note {
       font-size: 11px;
@@ -175,27 +201,30 @@
     .controls-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 8px;
       align-items: center;
-      margin: 8px 0 4px;
+      margin: 4px 0 0;
       grid-column: 1 / -1;
-      padding-left: 72px;
+      padding-left: 68px;
     }
 
     .status-bar {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 12px;
-      margin: 4px 0 6px;
+      gap: 10px 14px;
+      margin: 2px 0 2px;
       grid-column: 1 / -1;
-      padding-left: 72px;
+      padding: 8px 10px 8px 68px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 6px;
       font-size: 12px;
     }
-    #buyStatusLabel { font-weight: 600; }
-    #positionLabel { font-weight: 700; }
-    #positionLabel.open { color: #ef4444; }
-    #positionLabel.flat { color: #6b7280; }
+    #buyStatusLabel { font-weight: 650; }
+    #positionLabel { font-weight: 750; }
+    #positionLabel.open { color: var(--exit); }
+    #positionLabel.flat { color: var(--muted); }
     #strategyLabel {
       margin-left: auto;
       font-weight: 700;
@@ -203,62 +232,64 @@
       text-align: right;
     }
     #momentumAlert {
-      font-weight: 700;
+      font-weight: 750;
       font-size: 11px;
-      padding: 2px 6px;
-      border-radius: 4px;
+      padding: 2px 8px;
+      border-radius: 999px;
       display: none;
     }
     #momentumAlert.show {
       display: inline-block;
-      background: #ef4444;
-      color: #fff;
+      background: var(--amber-bg);
+      border: 1px solid var(--amber-border);
+      color: var(--amber);
     }
 
-    #logBox {
+    #lastActionLine {
       grid-column: 1 / -1;
-      width: 100%;
-      min-height: 120px;
-      max-height: 160px;
-      background: var(--mono-bg);
-      color: var(--mono-fg);
-      font-family: Consolas, monospace;
       font-size: 11px;
-      padding: 6px;
-      border: none;
-      border-radius: 4px;
-      resize: vertical;
+      color: var(--muted);
+      min-height: 1.2em;
+      padding-left: 68px;
     }
 
     .web-connect {
-      margin-top: 8px;
-      padding: 8px;
-      border: 1px dashed #cbd5e1;
+      margin-top: 10px;
+      padding: 8px 10px 10px;
+      border: 1px solid var(--border);
       border-radius: 6px;
-      background: #fafafa;
+      background: #f8fafc;
     }
     .web-connect summary {
       cursor: pointer;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 650;
       color: var(--muted);
     }
     .web-connect .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+    .web-connect label { font-size: 12px; color: var(--muted); font-weight: 600; }
     #message { font-size: 12px; margin-top: 6px; }
     #tradeResponse {
       font-size: 11px;
-      margin-top: 4px;
+      margin-top: 2px;
+      padding-left: 68px;
       white-space: pre-wrap;
       word-break: break-word;
       color: var(--muted);
     }
-    .green { color: #059669; }
-    .red { color: #dc2626; }
+    .green { color: var(--buy); }
+    .red { color: var(--exit); }
     .muted { color: var(--muted); }
     .na-tag {
-      font-size: 10px;
-      color: #9ca3af;
-      font-weight: normal;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    code {
+      font-size: 11px;
+      background: #eef2f7;
+      padding: 1px 5px;
+      border-radius: 4px;
     }
   </style>
 </head>
@@ -335,7 +366,7 @@
           <span id="strategyLabel">Strategy: —</span>
         </div>
 
-        <textarea id="logBox" readonly aria-label="Activity log"></textarea>
+        <div id="lastActionLine" aria-live="polite"></div>
         <div id="tradeResponse">—</div>
       </div>
 
@@ -359,11 +390,7 @@
         <div id="suggestedSymbol" class="muted" style="font-size:11px;margin-top:4px"></div>
         <span id="tradeStatus" class="muted" style="display:none">Idle</span>
       </details>
-    </section>
-
-    <section class="monitor-panel">
-      <h2>PnL Monitor</h2>
-      <pre id="monText">Connect to load live monitor…</pre>
+      <pre id="monText" hidden aria-hidden="true">Connect to load live monitor…</pre>
     </section>
   </div>
 
@@ -384,7 +411,7 @@
     const exitBtn = document.getElementById('exitBtn');
     const suggestBtn = document.getElementById('suggestBtn');
     const cePeBtn = document.getElementById('cePeBtn');
-    const logBox = document.getElementById('logBox');
+    const lastActionLine = document.getElementById('lastActionLine');
     const monText = document.getElementById('monText');
     const strikeOffsetEl = document.getElementById('strikeOffset');
 
@@ -436,8 +463,7 @@
       if (!msg || msg === lastLogAction) return;
       lastLogAction = msg;
       const ts = new Date().toLocaleTimeString();
-      logBox.value += `[${ts}] ${msg}\n`;
-      logBox.scrollTop = logBox.scrollHeight;
+      lastActionLine.textContent = `Last action: [${ts}] ${msg}`;
     }
 
     function parseSymbolParts(symbol) {
