@@ -275,9 +275,13 @@
     .web-connect label { font-size: 12px; color: var(--muted); font-weight: 600; }
     #message { font-size: 12px; margin-top: 6px; }
     #tradeResponse {
+      grid-column: 1 / -1;
+      width: 100%;
+      min-width: 0;
       font-size: 11px;
       margin-top: 2px;
       padding-left: 68px;
+      overflow-wrap: anywhere;
       white-space: pre-wrap;
       word-break: break-word;
       color: var(--muted);
@@ -1119,9 +1123,6 @@
         setTradeResult('Lots must be >= 1.', 'red');
         return;
       }
-
-      const ok = confirm(`${action} ${lots} lot(s) for ${trading_symbol}?`);
-      if (!ok) return;
 
       setTradeBusy(true, `${action} in progress...`);
       setTradeResult('Sending order...', 'muted');
