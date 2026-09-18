@@ -24,7 +24,8 @@
       --mono-fg: #1e293b;
       --control-h: 30px;
     }
-    * { box-sizing: border-box; }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
     body {
       font-family: "Segoe UI", Inter, "Helvetica Neue", Arial, sans-serif;
       background: var(--bg);
@@ -183,7 +184,9 @@
       flex-wrap: wrap;
       align-items: center;
       gap: 6px 8px;
+      min-width: 0;
     }
+    .param-pair { display: contents; }
     .params-readonly label { font-size: 11px; color: var(--muted); font-weight: 600; }
     .params-readonly input {
       width: 52px;
@@ -192,6 +195,7 @@
       color: var(--navy);
       font-variant-numeric: tabular-nums;
     }
+    #tradeLots { width: 48px; background: #fff; }
     .params-note {
       font-size: 11px;
       color: var(--muted);
@@ -267,6 +271,7 @@
       color: var(--muted);
     }
     .web-connect .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+    .web-connect .ltp-row { margin-top: 6px; }
     .web-connect label { font-size: 12px; color: var(--muted); font-weight: 600; }
     #message { font-size: 12px; margin-top: 6px; }
     #tradeResponse {
@@ -291,6 +296,310 @@
       padding: 1px 5px;
       border-radius: 4px;
     }
+    .strike-row .offset-label { font-size: 11px; margin-left: 6px; }
+    #strikeOffset { width: 88px; }
+    #suggestBtn { margin-left: 8px; }
+    #tradeSymbol { min-width: 240px; flex: 1; }
+    #token { min-width: 220px; }
+    #indexLtpManual { width: 180px; }
+    .ltp-hint { font-size: 11px; }
+    .connect-endpoints { font-size: 11px; margin-top: 6px; }
+    #suggestedSymbol { font-size: 11px; margin-top: 4px; }
+    .action-btns { display: flex; gap: 8px; align-items: center; flex: 0 0 auto; }
+    .auto-badges { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .controls-row .action-btns,
+    .controls-row .auto-badges { min-width: 0; }
+
+    @media (max-width: 600px) {
+      body {
+        font-size: 13px;
+        overflow-x: hidden;
+      }
+      .top-bar {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 8px 14px;
+        gap: 4px;
+      }
+      .top-bar h1 {
+        font-size: 13px;
+        line-height: 1.3;
+        max-width: 100%;
+      }
+      .top-meta {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+          "ip conn"
+          "time time";
+        gap: 2px 8px;
+        font-size: 11px;
+        min-width: 0;
+      }
+      .top-meta > span:first-child { grid-area: ip; }
+      #currentDateTime {
+        grid-area: time;
+        text-align: left;
+      }
+      #connStatus { grid-area: conn; justify-self: end; }
+      .top-meta > span {
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .main-container {
+        max-width: 100%;
+        padding: 8px 14px 12px;
+      }
+      .scalper-panel {
+        width: 100%;
+        max-width: 100%;
+        padding: 10px 12px 8px;
+        overflow-x: clip;
+      }
+
+      .form-grid {
+        grid-template-columns: 52px minmax(0, 1fr);
+        gap: 6px 8px;
+        align-items: center;
+        width: 100%;
+        min-width: 0;
+      }
+      .form-grid > * {
+        min-width: 0;
+        max-width: 100%;
+      }
+      .form-grid .lbl {
+        text-align: left;
+        font-size: 11px;
+        padding-right: 0;
+        align-self: start;
+        padding-top: 8px;
+        line-height: 1.2;
+      }
+
+      .row-inline {
+        min-width: 0;
+        max-width: 100%;
+      }
+
+      .strike-row {
+        display: grid;
+        grid-template-columns: 32px 32px minmax(0, 1fr);
+        grid-template-areas:
+          "up down offsetSelect"
+          "offsetLabel offsetLabel offsetLabel"
+          "suggest suggest suggest"
+          "ltp ltp ltp";
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        min-width: 0;
+      }
+      .strike-row .btn-sm {
+        width: 32px;
+        min-width: 32px;
+        height: 30px;
+        padding: 0;
+      }
+      #strikeUp { grid-area: up; }
+      #strikeDown { grid-area: down; }
+      .strike-row .offset-label {
+        margin-left: 0;
+        grid-area: offsetLabel;
+        white-space: nowrap;
+      }
+      #strikeOffset {
+        grid-area: offsetSelect;
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+      }
+      #suggestBtn {
+        grid-area: suggest;
+        margin-left: 0;
+        width: 100%;
+        justify-self: stretch;
+      }
+      #indexLtpLive {
+        grid-area: ltp;
+        width: 100%;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+
+      .option-row #cePeBtn,
+      #cePeBtn {
+        width: 100%;
+        min-width: 0;
+      }
+
+      .params-readonly {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 10px;
+        align-items: center;
+        width: 100%;
+      }
+      .param-pair {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 4px 6px;
+        align-items: center;
+        min-width: 0;
+      }
+      .params-readonly label {
+        white-space: nowrap;
+      }
+      .params-readonly input,
+      #tradeLots {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .params-note {
+        grid-column: 1 / -1;
+        margin: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .symbol-row {
+        display: block;
+        width: 100%;
+      }
+      #tradeSymbol {
+        min-width: 0;
+        width: 100%;
+        max-width: 100%;
+      }
+
+      .controls-row {
+        padding-left: 0;
+        margin: 2px 0 0;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .action-btns {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        width: 100%;
+        gap: 8px;
+      }
+      .btn-buy,
+      .btn-exit {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .auto-badges {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 6px;
+      }
+      .badge-auto {
+        justify-content: center;
+        min-width: 0;
+        width: 100%;
+        height: auto;
+        min-height: 28px;
+        padding: 4px 6px;
+        text-align: center;
+        overflow-wrap: anywhere;
+        font-size: 10px;
+      }
+
+      .status-bar {
+        padding: 8px 10px;
+        gap: 6px;
+        align-items: flex-start;
+        flex-direction: column;
+      }
+      .status-bar,
+      #lastActionLine,
+      #tradeResponse {
+        padding-left: 0;
+      }
+      #buyStatusLabel,
+      #positionLabel,
+      #strategyLabel,
+      #momentumAlert {
+        min-width: 0;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      #strategyLabel {
+        margin-left: 0;
+        text-align: left;
+        width: 100%;
+      }
+
+      #lastActionLine,
+      #tradeResponse {
+        padding-left: 0;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+
+      .web-connect {
+        width: 100%;
+        margin-top: 8px;
+        padding: 8px 10px;
+      }
+      .web-connect summary {
+        overflow-wrap: anywhere;
+      }
+      .web-connect .row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .web-connect input,
+      #token,
+      #indexLtpManual {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .ltp-hint,
+      .connect-endpoints,
+      #message,
+      #suggestedSymbol {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        max-width: 100%;
+      }
+      .connect-endpoints { margin-top: 4px; }
+      .connect-endpoints code {
+        display: inline-block;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
+      input, select, button {
+        max-width: 100%;
+      }
+    }
+
+    @media (max-width: 360px) {
+      .params-readonly {
+        grid-template-columns: 1fr;
+      }
+      .badge-auto {
+        font-size: 10px;
+        padding: 4px 5px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -307,40 +616,50 @@
     <section class="scalper-panel">
       <div class="form-grid">
         <span class="lbl">Strike:</span>
-        <div class="row-inline">
+        <div class="row-inline strike-row">
           <button type="button" class="btn-sm" id="strikeUp" title="Bump strike">▲</button>
           <button type="button" class="btn-sm" id="strikeDown" title="Lower strike">▼</button>
-          <label class="muted" style="font-size:11px;margin-left:6px">Offset</label>
-          <select id="strikeOffset" style="width:88px">
+          <label class="muted offset-label">Offset</label>
+          <select id="strikeOffset">
             <option value="0">ATM</option>
           </select>
-          <button type="button" id="suggestBtn" style="margin-left:8px">Suggest</button>
+          <button type="button" id="suggestBtn">Suggest</button>
           <span id="indexLtpLive" class="muted na-tag"></span>
         </div>
 
         <span class="lbl">Option:</span>
-        <div>
+        <div class="option-row">
           <button type="button" id="cePeBtn" class="btn-ce">CE</button>
         </div>
 
         <span class="lbl">Params:</span>
         <div class="params-readonly">
-          <label>Lots</label>
-          <input id="tradeLots" type="number" min="1" step="1" value="1" style="width:48px;background:#fff" />
-          <label>Tgt</label>
-          <input id="paramTgt" readonly title="From worker snapshot" placeholder="—" />
-          <label>SL</label>
-          <input id="paramSl" readonly placeholder="—" />
-          <label>Trl</label>
-          <input id="paramTrl" readonly placeholder="—" />
-          <label>PT</label>
-          <input id="paramPt" readonly placeholder="—" />
+          <div class="param-pair">
+            <label>Lots</label>
+            <input id="tradeLots" type="number" min="1" step="1" value="1" />
+          </div>
+          <div class="param-pair">
+            <label>Tgt</label>
+            <input id="paramTgt" readonly title="From worker snapshot" placeholder="—" />
+          </div>
+          <div class="param-pair">
+            <label>SL</label>
+            <input id="paramSl" readonly placeholder="—" />
+          </div>
+          <div class="param-pair">
+            <label>Trl</label>
+            <input id="paramTrl" readonly placeholder="—" />
+          </div>
+          <div class="param-pair">
+            <label>PT</label>
+            <input id="paramPt" readonly placeholder="—" />
+          </div>
           <span id="paramsNote" class="params-note">Server params appear after Connect</span>
         </div>
 
         <span class="lbl">Symbol:</span>
-        <div class="row-inline">
-          <input id="tradeSymbol" type="text" placeholder="NIFTY26AUG25000CE" style="min-width:240px;flex:1" />
+        <div class="row-inline symbol-row">
+          <input id="tradeSymbol" type="text" placeholder="NIFTY26AUG25000CE" />
           <select id="baseSymbol" style="display:none" aria-hidden="true">
             <option value="NIFTY">NIFTY</option>
             <option value="BANKNIFTY">BANKNIFTY</option>
@@ -353,10 +672,14 @@
         </div>
 
         <div class="controls-row">
-          <button type="button" id="buyBtn" class="btn-buy">BUY</button>
-          <button type="button" id="exitBtn" class="btn-exit">EXIT</button>
-          <span id="autoBuyBadge" class="badge-auto">AUTO BUY: —</span>
-          <span id="autoSellBadge" class="badge-auto">AUTO SELL: —</span>
+          <div class="action-btns">
+            <button type="button" id="buyBtn" class="btn-buy">BUY</button>
+            <button type="button" id="exitBtn" class="btn-exit">EXIT</button>
+          </div>
+          <div class="auto-badges">
+            <span id="autoBuyBadge" class="badge-auto">AUTO BUY: —</span>
+            <span id="autoSellBadge" class="badge-auto">AUTO SELL: —</span>
+          </div>
         </div>
 
         <div class="status-bar">
@@ -374,20 +697,20 @@
         <summary>Web connection (snapshot &amp; orders)</summary>
         <div class="row">
           <label for="token">API Token</label>
-          <input id="token" type="password" placeholder="WEB_API_TOKEN (optional)" style="min-width:220px" />
+          <input id="token" type="password" placeholder="WEB_API_TOKEN (optional)" />
           <button type="button" id="connectBtn">Connect</button>
           <span id="status" class="muted">Disconnected</span>
         </div>
-        <div class="row" style="margin-top:6px">
+        <div class="row ltp-row">
           <label for="indexLtpManual">Index LTP</label>
-          <input id="indexLtpManual" type="number" step="0.05" placeholder="From snapshot or type manually" style="width:180px" />
-          <span class="muted" style="font-size:11px">Used only for Suggest (not displayed as live quote)</span>
+          <input id="indexLtpManual" type="number" step="0.05" placeholder="From snapshot or type manually" />
+          <span class="muted ltp-hint">Used only for Suggest (not displayed as live quote)</span>
         </div>
-        <div class="muted" style="font-size:11px;margin-top:6px">
+        <div class="muted connect-endpoints">
           <code>/api/monitor/snapshot</code> · <code>/ws/monitor</code> · <code>/api/trade/action</code>
         </div>
         <div id="message" class="muted">Click Connect to stream live worker data (no mock quotes).</div>
-        <div id="suggestedSymbol" class="muted" style="font-size:11px;margin-top:4px"></div>
+        <div id="suggestedSymbol" class="muted"></div>
         <span id="tradeStatus" class="muted" style="display:none">Idle</span>
       </details>
       <pre id="monText" hidden aria-hidden="true">Connect to load live monitor…</pre>
