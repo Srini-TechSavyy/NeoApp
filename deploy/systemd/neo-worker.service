@@ -7,8 +7,12 @@ Type=simple
 User=neoapp
 Group=neoapp
 WorkingDirectory=/opt/neoapp2/current
+Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=/etc/neoapp2/neoapp.env
 ExecStart=/opt/neoapp2/venv/bin/python -m web.worker.main
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=neo-worker
 Restart=always
 RestartSec=5
 TimeoutStopSec=30

@@ -148,25 +148,24 @@ Web mode currently includes:
 
 ### GitHub Actions Deployment (Azure VM)
 
-Deployment workflow added:
+Deployment workflow:
 
 - [.github/workflows/deploy-azure-vm.yml](.github/workflows/deploy-azure-vm.yml)
 
-This workflow:
+Full runbook: [deploy/AZURE_DEPLOY.md](deploy/AZURE_DEPLOY.md)
 
-1. Creates a release bundle
-2. Uploads to Azure VM over SSH
-3. Switches the active release symlink
-4. Restarts `neo-worker.service` and `neo-fastapi.service`
-5. Calls `/health` for verification
+This workflow runs on a **self-hosted GitHub Actions runner** installed on the Azure VM (labels: `self-hosted`, `linux`, `x64`, `neoapp2`). It:
 
-Required repository secrets:
+1. Creates a release bundle under `/opt/neoapp2/releases/`
+2. Symlinks persistent `shared/logs` into each release
+3. Installs Python dependencies into `/opt/neoapp2/venv`
+4. Switches the `/opt/neoapp2/current` symlink
+5. Restarts `neo-worker.service` and `neo-fastapi.service`
+6. Calls `/health` (rolls back to the previous release on failure)
 
-- `AZURE_VM_HOST`
-- `AZURE_VM_USER`
-- `AZURE_VM_SSH_KEY`
-- `AZURE_VM_PORT` (optional)
-- `DEPLOY_PATH`
+**VM setup:** run [scripts/azure/setup_vm.sh](scripts/azure/setup_vm.sh), configure `/etc/neoapp2/neoapp.env` from [deploy/env.example](deploy/env.example), register the self-hosted runner, and grant passwordless `systemctl`/`nginx` sudo for the runner user (see runbook).
+
+**Defaults:** `TRADING_ENABLED=false`, `WEB_ALLOW_LOCAL_NOAUTH=false`. SSH-based deploy secrets (`AZURE_VM_*`) are not used by the current workflow; they are only needed if you add a separate SSH deploy job later.
 
 The application will:
 1. Auto-login using your credentials

@@ -32,14 +32,23 @@ jobs:
           APP_DIR="/opt/neoapp2"
           RELEASE_ID="$(date +%Y%m%d%H%M%S)-${GITHUB_RUN_ID}"
           RELEASE_DIR="$APP_DIR/releases/$RELEASE_ID"
+          PREVIOUS_RELEASE=""
+          if [[ -L "$APP_DIR/current" ]]; then
+            PREVIOUS_RELEASE="$(readlink -f "$APP_DIR/current" || true)"
+          fi
+
+          mkdir -p "$APP_DIR/shared/logs" "$APP_DIR/shared/data" "$APP_DIR/shared/assets"
+          mkdir -p "$RELEASE_DIR"
 
           echo "APP_DIR=$APP_DIR" >> "$GITHUB_ENV"
           echo "RELEASE_DIR=$RELEASE_DIR" >> "$GITHUB_ENV"
           echo "VENV_DIR=$APP_DIR/venv" >> "$GITHUB_ENV"
-
-          mkdir -p "$RELEASE_DIR"
+          echo "PREVIOUS_RELEASE=$PREVIOUS_RELEASE" >> "$GITHUB_ENV"
 
           echo "Release directory: $RELEASE_DIR"
+          if [[ -n "$PREVIOUS_RELEASE" ]]; then
+            echo "Previous release: $PREVIOUS_RELEASE"
+          fi
 
       - name: Copy application to release
         shell: bash
@@ -57,7 +66,11 @@ jobs:
             --exclude='*.log' \
             --exclude='logs/' \
             --exclude='buy_disabled.json' \
+            --exclude='node_modules/' \
             ./ "$RELEASE_DIR/"
+
+          rm -rf "$RELEASE_DIR/logs"
+          ln -sfn "$APP_DIR/shared/logs" "$RELEASE_DIR/logs"
 
       - name: Verify environment
         shell: bash
@@ -95,6 +108,9 @@ jobs:
             "$RELEASE_DIR/web/backend/main.py" \
             "$RELEASE_DIR/web/worker/main.py"
 
+          cd "$RELEASE_DIR"
+          "$VENV_DIR/bin/python" -c "import web.backend.main; import web.worker.main"
+
           echo "Release validation: OK"
 
       - name: Activate release
@@ -103,6 +119,7 @@ jobs:
           set -euo pipefail
 
           ln -sfn "$RELEASE_DIR" "$APP_DIR/current"
+          ln -sfn "$APP_DIR/shared/logs" "$APP_DIR/current/logs"
 
           echo "Current release:"
           readlink -f "$APP_DIR/current"
@@ -114,19 +131,47 @@ jobs:
 
           sudo -n /usr/bin/systemctl restart neo-worker.service
           sudo -n /usr/bin/systemctl restart neo-fastapi.service
+          sudo -n /usr/bin/nginx -t
           sudo -n /usr/bin/systemctl reload nginx
 
           echo "Services restarted."
 
       - name: Health check
+        id: health
         shell: bash
         run: |
           set -euo pipefail
+
+          rollback() {
+            if [[ -z "${PREVIOUS_RELEASE:-}" ]]; then
+              echo "No previous release to roll back to."
+              return 1
+            fi
+            if [[ "$PREVIOUS_RELEASE" == "$RELEASE_DIR" ]]; then
+              echo "Previous release is the same as failed release; skipping rollback."
+              return 1
+            fi
+            echo "Rolling back to: $PREVIOUS_RELEASE"
+            ln -sfn "$PREVIOUS_RELEASE" "$APP_DIR/current"
+            ln -sfn "$APP_DIR/shared/logs" "$APP_DIR/current/logs"
+            sudo -n /usr/bin/systemctl restart neo-worker.service
+            sudo -n /usr/bin/systemctl restart neo-fastapi.service
+          }
 
           for i in {1..15}; do
             if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
               echo "Health check passed."
               curl -fsS http://127.0.0.1:8000/health
+
+              API_TOKEN="$(grep -E '^WEB_API_TOKEN=' /etc/neoapp2/neoapp.env | cut -d= -f2- | tr -d '\r' || true)"
+              if [[ -n "$API_TOKEN" && "$API_TOKEN" != replace_with_openssl_rand_hex_32 ]]; then
+                curl -fsS http://127.0.0.1:8000/api/system/status \
+                  -H "X-API-Key: ${API_TOKEN}" >/dev/null
+                echo "Authenticated /api/system/status: OK"
+              else
+                echo "Skipping authenticated API check (WEB_API_TOKEN not configured)."
+              fi
+
               exit 0
             fi
 
@@ -137,9 +182,11 @@ jobs:
           echo "Health check failed."
           sudo -n /usr/bin/systemctl status neo-fastapi.service --no-pager || true
           sudo -n /usr/bin/systemctl status neo-worker.service --no-pager || true
+          rollback || true
           exit 1
 
       - name: Deployment summary
+        if: success()
         shell: bash
         run: |
           echo "Deployment completed successfully."
