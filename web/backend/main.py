@@ -5,6 +5,12 @@ import os
 import socket
 from datetime import datetime
 
+from dotenv import load_dotenv
+
+from common.utils import get_resource_path
+
+load_dotenv(get_resource_path(".env"))
+
 from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse

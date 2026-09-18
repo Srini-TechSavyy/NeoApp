@@ -42,16 +42,52 @@ echo "[4/9] Installing systemd unit files"
 sudo cp "$REPO_ROOT/deploy/systemd/neo-fastapi.service" /etc/systemd/system/neo-fastapi.service
 sudo cp "$REPO_ROOT/deploy/systemd/neo-worker.service" /etc/systemd/system/neo-worker.service
 
-echo "[5/9] Installing Nginx site config"
-sudo sed "s/__SERVER_NAME__/$DOMAIN/g" "$REPO_ROOT/deploy/nginx/neoapp2.conf" \
-  | sudo tee /etc/nginx/sites-available/neoapp2 >/dev/null
+echo "[5/9] Installing Nginx HTTP site (TLS after certificate)"
+sudo tee /etc/nginx/sites-available/neoapp2 >/dev/null <<NGINX
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location /ws/monitor {
+        proxy_pass http://127.0.0.1:8000/ws/monitor;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 300s;
+        proxy_buffering off;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 300s;
+    }
+}
+NGINX
 sudo ln -sfn /etc/nginx/sites-available/neoapp2 /etc/nginx/sites-enabled/neoapp2
-sudo rm -f /etc/nginx/sites-enabled/default
+sudo rm -f /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/neoapp
+sudo mkdir -p /var/www/html
 sudo nginx -t
 sudo systemctl reload nginx
 
 echo "[6/9] Requesting TLS certificate"
 sudo certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos -m "$LE_EMAIL" --redirect
+sudo sed "s/__SERVER_NAME__/$DOMAIN/g" "$REPO_ROOT/deploy/nginx/neoapp2.conf" \
+  | sudo tee /etc/nginx/sites-available/neoapp2 >/dev/null
+sudo nginx -t
+sudo systemctl reload nginx
 
 echo "[7/9] Runtime environment file template"
 if [[ ! -f "$ENV_DIR/neoapp.env" ]]; then

@@ -19,3 +19,4 @@ node_modules/
 
 buy_disabled.json
 .env.cloudflare
+NeoVM2_key.pem
