@@ -1,6 +1,10 @@
 name: Deploy to Azure VM
 
 on:
+  push:
+    branches:
+      - dev
+
   workflow_dispatch:
     inputs:
       deploy_ref:
