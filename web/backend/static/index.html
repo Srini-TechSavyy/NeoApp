@@ -747,14 +747,25 @@
     const monText = document.getElementById('monText');
     const strikeOffsetEl = document.getElementById('strikeOffset');
 
-    (function initOffsetOptions() {
+    function getIndexLtpValue() {
+      const hidden = Number(document.getElementById('indexLtp')?.value || '0');
+      const manual = Number(document.getElementById('indexLtpManual')?.value || '0');
+      if (Number.isFinite(hidden) && hidden > 0) return hidden;
+      if (Number.isFinite(manual) && manual > 0) return manual;
+      return 0;
+    }
+
+    function initOffsetOptions() {
+      if (!strikeOffsetEl) return;
+      strikeOffsetEl.innerHTML = '';
       for (let i = -10; i <= 10; i++) {
         const opt = document.createElement('option');
         opt.value = String(i);
         opt.textContent = i === 0 ? 'ATM' : `ATM ${i > 0 ? '+' : ''}${i}`;
         strikeOffsetEl.appendChild(opt);
       }
-    })();
+    }
+    initOffsetOptions();
 
     function updateCurrentDateTime() {
       const now = new Date();
@@ -781,9 +792,9 @@
     }
 
     function setTradeBusy(busy, text = 'Working...') {
-      buyBtn.disabled = busy;
-      exitBtn.disabled = busy;
-      tradeStatusEl.textContent = busy ? text : 'Idle';
+      if (buyBtn) buyBtn.disabled = busy;
+      if (exitBtn) exitBtn.disabled = busy;
+      if (tradeStatusEl) tradeStatusEl.textContent = busy ? text : 'Idle';
     }
 
     function setTradeResult(msg, cls = 'muted') {
@@ -792,7 +803,7 @@
     }
 
     function appendLog(msg) {
-      if (!msg || msg === lastLogAction) return;
+      if (!lastActionLine || !msg || msg === lastLogAction) return;
       lastLogAction = msg;
       const ts = new Date().toLocaleTimeString();
       lastActionLine.textContent = `Last action: [${ts}] ${msg}`;
@@ -844,9 +855,31 @@
     }
 
     function syncCePeButton() {
+      if (!cePeBtn) return;
       const opt = document.getElementById('optionType').value;
       cePeBtn.textContent = opt;
       cePeBtn.className = opt === 'PE' ? 'btn-pe' : 'btn-ce';
+    }
+
+    function bindClick(el, handler) {
+      if (el && typeof handler === 'function') el.addEventListener('click', handler);
+    }
+
+    function bumpStrike(delta) {
+      const cur = tradeSymbolEl?.value?.trim() || '';
+      if (!cur) {
+        setTradeResult('Enter a symbol before adjusting strike.', 'red');
+        return;
+      }
+      const step = detectStrikeStep(cur);
+      const parts = parseSymbolParts(cur);
+      if (!parts) {
+        setTradeResult('Strike adjust: symbol format not recognized.', 'red');
+        return;
+      }
+      const nextStrike = parts.strike + delta * step;
+      if (nextStrike <= 0) return;
+      tradeSymbolEl.value = updateSymbolStrike(cur, nextStrike);
     }
 
     function strategyFromIndicator(indicator) {
@@ -1320,8 +1353,8 @@
       const base_symbol = inferBaseSymbol(tradeSymbolEl.value || document.getElementById('baseSymbol').value);
       document.getElementById('baseSymbol').value = base_symbol;
       const option_type = document.getElementById('optionType').value;
-      const index_ltp = Number(document.getElementById('indexLtp').value || document.getElementById('indexLtpManual').value || '0');
-      const offset = Number(strikeOffsetEl.value || '0');
+      const index_ltp = getIndexLtpValue();
+      const offset = Number(strikeOffsetEl?.value || '0');
 
       if (!Number.isFinite(index_ltp) || index_ltp <= 0) {
         document.getElementById('suggestedSymbol').textContent = 'Suggest: need index LTP from snapshot or worker live';
@@ -1396,11 +1429,19 @@
       }
     });
 
-    buyBtn.addEventListener('click', () => executeTrade('BUY'));
-    exitBtn.addEventListener('click', () => executeTrade('EXIT'));
-    suggestBtn.addEventListener('click', suggestSymbol);
+    bindClick(document.getElementById('strikeUp'), () => bumpStrike(1));
+    bindClick(document.getElementById('strikeDown'), () => bumpStrike(-1));
+    bindClick(suggestBtn, () => { suggestSymbol(); });
+    if (strikeOffsetEl) {
+      strikeOffsetEl.addEventListener('change', () => {
+        if (getIndexLtpValue() > 0) suggestSymbol();
+      });
+    }
 
-    cePeBtn.addEventListener('click', () => {
+    bindClick(buyBtn, () => executeTrade('BUY'));
+    bindClick(exitBtn, () => executeTrade('EXIT'));
+
+    bindClick(cePeBtn, () => {
       const optEl = document.getElementById('optionType');
       const next = optEl.value === 'CE' ? 'PE' : 'CE';
       optEl.value = next;
@@ -1409,29 +1450,12 @@
       if (cur) tradeSymbolEl.value = updateSymbolOption(cur, next);
     });
 
-    document.getElementById('strikeUp').addEventListener('click', () => {
-      const cur = tradeSymbolEl.value.trim();
-      if (!cur) return;
-      const step = detectStrikeStep(cur);
-      const parts = parseSymbolParts(cur);
-      if (!parts) return;
-      tradeSymbolEl.value = updateSymbolStrike(cur, parts.strike + step);
-    });
-
-    document.getElementById('strikeDown').addEventListener('click', () => {
-      const cur = tradeSymbolEl.value.trim();
-      if (!cur) return;
-      const step = detectStrikeStep(cur);
-      const parts = parseSymbolParts(cur);
-      if (!parts || parts.strike - step <= 0) return;
-      tradeSymbolEl.value = updateSymbolStrike(cur, parts.strike - step);
-    });
-
-    strikeOffsetEl.addEventListener('change', () => {
-      if (Number(document.getElementById('indexLtp').value) > 0) suggestSymbol();
-    });
-
-    const saved = localStorage.getItem('neo_web_token') || '';
+    let saved = '';
+    try {
+      saved = localStorage.getItem('neo_web_token') || '';
+    } catch (_) {
+      saved = '';
+    }
     tokenEl.value = saved;
     syncCePeButton();
     updateCurrentDateTime();
