@@ -1,3 +1,5 @@
+import logging
+import threading
 import time
 from typing import Dict, List, Optional, Tuple
 
@@ -6,16 +8,53 @@ from common.scrip_master import find_token_for_trading_symbol, get_lot_size_from
 from web.shared.order_status import lookup_order_status
 from web.shared.trade_latency import TradeLatencyRecorder
 
+logger = logging.getLogger("neoapp.web.trading_actions")
+
 _SYMBOLS_LOADED = False
+_SYMBOLS_LOCK = threading.Lock()
 
 
 def _ensure_symbols_loaded(latency: Optional[TradeLatencyRecorder] = None) -> None:
+    """Load scrip master once; concurrent callers share a single load."""
     global _SYMBOLS_LOADED
-    if not _SYMBOLS_LOADED:
+    if _SYMBOLS_LOADED:
+        return
+    with _SYMBOLS_LOCK:
+        if _SYMBOLS_LOADED:
+            return
         load_scrip_master_csv()
         _SYMBOLS_LOADED = True
         if latency:
             latency.mark("scrip_master_load")
+
+
+def preload_scrip_master() -> bool:
+    """
+    Eagerly load the scrip master (startup path).
+    Returns True on success. Failures are logged and do not raise so callers
+    can keep serving while lazy-load remains available.
+    """
+    logger.info("scrip_master_preload_start")
+    t0 = time.perf_counter()
+    try:
+        _ensure_symbols_loaded()
+        duration_ms = round((time.perf_counter() - t0) * 1000, 1)
+        logger.info(
+            "scrip_master_preload_success scrip_master_preload_duration_ms=%.1f",
+            duration_ms,
+        )
+        return True
+    except Exception:
+        duration_ms = round((time.perf_counter() - t0) * 1000, 1)
+        logger.exception(
+            "scrip_master_preload_failed scrip_master_preload_duration_ms=%.1f",
+            duration_ms,
+        )
+        return False
+
+
+def is_scrip_master_loaded() -> bool:
+    return _SYMBOLS_LOADED
 
 
 def _normalize_list_payload(payload) -> List[dict]:

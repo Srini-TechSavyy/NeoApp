@@ -1267,14 +1267,21 @@
     async function executeTrade(action) {
       if (tradeInFlight) return;
       const token = tokenEl.value.trim();
-      if (action === 'BUY' && getIndexLtpValue() > 0) {
-        await suggestSymbol();
-      }
-      const trading_symbol = tradeSymbolEl.value.trim().toUpperCase();
+      let trading_symbol = tradeSymbolEl.value.trim().toUpperCase();
       const lots = Number(tradeLotsEl.value || '0');
 
+      // Avoid a redundant /api/symbol/suggest round-trip when the symbol is already set.
+      // Suggest only if the required trading symbol is missing/invalid and LTP can resolve one.
+      if ((!trading_symbol || trading_symbol.length < 5) && getIndexLtpValue() > 0) {
+        await suggestSymbol();
+        trading_symbol = tradeSymbolEl.value.trim().toUpperCase();
+      }
+
       if (!trading_symbol || trading_symbol.length < 5) {
-        setTradeResult('Please enter a valid trading symbol.', 'red');
+        setTradeResult(
+          'Cannot resolve trading symbol for ' + action + '. Enter a valid symbol or use Suggest.',
+          'red'
+        );
         return;
       }
       if (!Number.isFinite(lots) || lots < 1) {

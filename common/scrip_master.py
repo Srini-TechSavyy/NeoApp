@@ -6,7 +6,6 @@ import time
 from datetime import datetime
 from .utils import log_with_callback
 from .config import NSE_SCRIP_MASTER_PATH, BSE_SCRIP_MASTER_PATH
-from .neo_login import get_neo_client
 import requests
 
 _scrip_master_df: Optional[pd.DataFrame] = None
@@ -32,10 +31,16 @@ def load_scrip_master_csv(paths: Optional[list] = None, log_cb=None) -> None:
         if needs_update:
             log_with_callback(log_cb, "Scrip master is outdated. Downloading latest from Kotak...")
             try:
-                client = get_neo_client()
+                # Prefer an existing authenticated session to avoid a second broker login.
+                # Lazy import avoids circular import with common.orders.
+                from .orders import ensure_login, get_client
+
+                client = get_client()
+                if client is None:
+                    client = ensure_login(log_cb=log_cb)
                 url = client.scrip_master(exchange_segment="nse_fo")
                 headers = {"Authorization": f"Bearer {client.access_token}"} if hasattr(client, 'access_token') else {}
-                resp = requests.get(url, headers=headers)
+                resp = requests.get(url, headers=headers, timeout=30)
                 if resp.status_code == 200:
                     with open(NSE_SCRIP_MASTER_PATH, 'wb') as f:
                         f.write(resp.content)

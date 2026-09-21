@@ -4,6 +4,7 @@ import logging
 import os
 import socket
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Optional
 
@@ -43,11 +44,40 @@ from web.shared.trade_orders import (
     complete_idempotent_trade,
     register_pending_order,
 )
-from web.shared.trading_actions import execute_market_action
+from web.shared.trading_actions import execute_market_action, preload_scrip_master
 
-app = FastAPI(title="NeoApp Web API", version="0.1.0")
 logger = logging.getLogger("neoapp.web.api")
 logging.basicConfig(level=os.getenv("WEB_LOG_LEVEL", "INFO"))
+
+SCRIP_MASTER_PRELOAD_TIMEOUT_SECONDS = float(
+    os.getenv("SCRIP_MASTER_PRELOAD_TIMEOUT_SECONDS", "60")
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Preload scrip master at startup without blocking the app indefinitely."""
+    loop = asyncio.get_running_loop()
+    try:
+        await asyncio.wait_for(
+            loop.run_in_executor(None, preload_scrip_master),
+            timeout=SCRIP_MASTER_PRELOAD_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        logger.warning(
+            "scrip_master_preload_failed reason=timeout timeout_s=%.1f "
+            "(lazy-load fallback remains available)",
+            SCRIP_MASTER_PRELOAD_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        logger.exception(
+            "scrip_master_preload_failed reason=unexpected "
+            "(lazy-load fallback remains available)"
+        )
+    yield
+
+
+app = FastAPI(title="NeoApp Web API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
