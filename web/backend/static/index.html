@@ -60,7 +60,13 @@
       font-weight: 600;
       color: var(--muted);
     }
-    #serverIp { color: var(--buy); }
+    #topActualPnl,
+    #topNetPnl { font-variant-numeric: tabular-nums; }
+    #topActualPnl.positive,
+    #topNetPnl.positive { color: var(--buy); }
+    #topActualPnl.negative,
+    #topNetPnl.negative { color: var(--exit); }
+    #topBrokerage { font-variant-numeric: tabular-nums; color: var(--muted); }
     #connStatus.disconnected { color: var(--exit); }
     #connStatus.connected { color: var(--buy); }
 
@@ -337,15 +343,16 @@
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
         grid-template-areas:
-          "ip conn"
-          "time time";
+          "actual net"
+          "brok conn";
         gap: 2px 8px;
         font-size: 11px;
         min-width: 0;
       }
-      .top-meta > span:first-child { grid-area: ip; }
-      #currentDateTime {
-        grid-area: time;
+      #topActualWrap { grid-area: actual; }
+      #topNetWrap { grid-area: net; justify-self: end; }
+      #topBrokerageWrap {
+        grid-area: brok;
         text-align: left;
       }
       #connStatus { grid-area: conn; justify-self: end; }
@@ -612,8 +619,9 @@
   <header class="top-bar">
     <h1>SCALPER &amp; MONITOR PRO</h1>
     <div class="top-meta">
-      <span>IP: <span id="serverIp">--</span></span>
-      <span id="currentDateTime">--</span>
+      <span id="topActualWrap">Actual PnL: <span id="topActualPnl">—</span></span>
+      <span id="topNetWrap">Net PnL: <span id="topNetPnl">—</span></span>
+      <span id="topBrokerageWrap">Brokerage: <span id="topBrokerage">—</span></span>
       <span id="connStatus" class="disconnected">Offline</span>
     </div>
   </header>
@@ -767,11 +775,42 @@
     }
     initOffsetOptions();
 
-    function updateCurrentDateTime() {
-      const now = new Date();
-      const datePart = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-      const timePart = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-      document.getElementById('currentDateTime').textContent = `${datePart} ${timePart}`;
+    function formatSignedMoney(v) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return '—';
+      const sign = n > 0 ? '+' : '';
+      return `${sign}${n.toFixed(2)}`;
+    }
+
+    function applySignedPnlEl(el, value) {
+      if (!el) return;
+      if (value === null || value === undefined || value === '') {
+        el.textContent = '—';
+        el.classList.remove('positive', 'negative');
+        return;
+      }
+      el.textContent = formatSignedMoney(value);
+      el.classList.remove('positive', 'negative');
+      const n = Number(value);
+      if (Number.isFinite(n) && n !== 0) {
+        el.classList.add(n > 0 ? 'positive' : 'negative');
+      }
+    }
+
+    function renderTopBarPnl(pnl) {
+      const actualEl = document.getElementById('topActualPnl');
+      const netEl = document.getElementById('topNetPnl');
+      const brokEl = document.getElementById('topBrokerage');
+      if (!actualEl || !netEl || !brokEl) return;
+
+      const p = pnl && typeof pnl === 'object' ? pnl : {};
+      applySignedPnlEl(actualEl, p.gross);
+      applySignedPnlEl(netEl, p.net);
+
+      const charges = p.charges;
+      brokEl.textContent = charges === null || charges === undefined || charges === ''
+        ? '—'
+        : Number(charges).toFixed(2);
     }
 
     function setStatus(msg, cls = 'muted') {
@@ -1042,6 +1081,7 @@
       if (payload && payload.warming_up && !payload.data) {
         setMessage(payload.message || 'Worker is warming up…', 'muted');
         monText.textContent = payload.message || 'Waiting for worker snapshot…';
+        renderTopBarPnl(null);
         setConnStatus(false);
         return;
       }
@@ -1065,6 +1105,7 @@
       }
 
       monText.textContent = buildMonitorText(data);
+      renderTopBarPnl(data.pnl);
 
       const indicator = data.indicator || {};
       const risk = data.risk || {};
@@ -1119,9 +1160,6 @@
 
     function renderSystemStatus(status) {
       if (!status) return;
-      const ip = document.getElementById('serverIp');
-      ip.textContent = status.server_ip || '—';
-
       systemTradingEnabled = status.trading_enabled;
       renderRisk(lastRisk, systemTradingEnabled);
     }
@@ -1469,8 +1507,6 @@
     }
     tokenEl.value = saved;
     syncCePeButton();
-    updateCurrentDateTime();
-    setInterval(updateCurrentDateTime, 1000);
   </script>
 </body>
 </html>
