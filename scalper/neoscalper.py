@@ -159,7 +159,7 @@ last_logged_params_symbol = ""
 # ROOT
 # ---------------------------------------------------------
 root = tk.Tk()
-root.title("SCALPER & MONITOR PRO")
+root.title("SCALPER PRO")
 root.geometry("850x340")
 root.resizable(True, True)
 root.configure(bg="#f5f5f5")
