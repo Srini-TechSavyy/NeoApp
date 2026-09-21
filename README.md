@@ -34,7 +34,7 @@ A professional trading application for scalping and real-time PnL monitoring, bu
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/SriniArch/NeoApp.git
+   git clone https://github.com/Srini-TechSavyy/NeoApp.git
    cd NeoApp2
    ```
 
