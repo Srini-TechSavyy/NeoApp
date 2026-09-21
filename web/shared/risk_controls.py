@@ -128,11 +128,11 @@ def evaluate_risk_state(completed_trades: List[Dict], last_exit_epoch: float = 0
                 "highest_threshold": highest_threshold,
             })
 
-    # Cool-off
+    # Cool-off (between manual trades; should never exceed cool_off_seconds)
     cooloff_remaining = 0
     if cool_off_seconds > 0 and last_exit_epoch > 0:
         elapsed = now - last_exit_epoch
-        if elapsed < cool_off_seconds:
+        if elapsed >= 0 and elapsed < cool_off_seconds:
             cooloff_remaining = int(cool_off_seconds - elapsed)
 
     # Expire lock if elapsed and no active threshold trigger

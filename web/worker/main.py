@@ -13,6 +13,7 @@ import common.orders as orders_module
 from common.orders import detect_exchange_segment
 from common.scrip_master import find_token_for_trading_symbol, get_lot_size_from_scrip_master, load_scrip_master_csv
 from common.config import COOL_OFF_PERIOD
+from common.time_utils import market_time_to_epoch
 from indicator.scalping_indicator import LiveScalpingManager, RSIMomentumStrategy
 from monitor.pnl_engine import PositionPnLEngine, parse_api_orders
 from web.shared.monitor_snapshot import build_monitor_snapshot
@@ -216,8 +217,7 @@ def _run_once(client, manager: LiveScalpingManager, runtime_state: dict):
     last_exit_time = 0.0
     if engine.completed_trades:
         st = engine.completed_trades[-1].get("sell_time") or engine.completed_trades[-1].get("buy_time")
-        if hasattr(st, "timestamp"):
-            last_exit_time = float(st.timestamp())
+        last_exit_time = market_time_to_epoch(st) if st is not None else 0.0
 
     open_pos = _extract_open_position(client)
 

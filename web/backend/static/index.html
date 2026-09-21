@@ -1267,6 +1267,9 @@
     async function executeTrade(action) {
       if (tradeInFlight) return;
       const token = tokenEl.value.trim();
+      if (action === 'BUY' && getIndexLtpValue() > 0) {
+        await suggestSymbol();
+      }
       const trading_symbol = tradeSymbolEl.value.trim().toUpperCase();
       const lots = Number(tradeLotsEl.value || '0');
 
@@ -1441,13 +1444,14 @@
     bindClick(buyBtn, () => executeTrade('BUY'));
     bindClick(exitBtn, () => executeTrade('EXIT'));
 
-    bindClick(cePeBtn, () => {
+    bindClick(cePeBtn, async () => {
       const optEl = document.getElementById('optionType');
       const next = optEl.value === 'CE' ? 'PE' : 'CE';
       optEl.value = next;
       syncCePeButton();
       const cur = tradeSymbolEl.value.trim();
       if (cur) tradeSymbolEl.value = updateSymbolOption(cur, next);
+      if (getIndexLtpValue() > 0) await suggestSymbol();
     });
 
     let saved = '';
