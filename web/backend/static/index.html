@@ -1074,6 +1074,44 @@
       as.classList.toggle('on', sellOn);
     }
 
+    function formatDuration(totalSeconds) {
+      const sec = Math.max(0, Math.ceil(Number(totalSeconds) || 0));
+      const mins = Math.floor(sec / 60);
+      const rem = sec % 60;
+      if (mins > 0) return `${mins}m ${String(rem).padStart(2, '0')}s`;
+      return `${rem}s`;
+    }
+
+    function lockRemainingSeconds(risk) {
+      const cooloff = Number(risk.cooloff_remaining) || 0;
+      if (cooloff > 0) return cooloff;
+      const until = Number(risk.disabled_until);
+      if (!Number.isFinite(until) || until <= 0) return 0;
+      return Math.max(0, Math.ceil(until - Date.now() / 1000));
+    }
+
+    function formatBuyLockReason(risk) {
+      const raw = String(risk.reason || '').trim();
+      const remaining = lockRemainingSeconds(risk);
+      let label = raw;
+      if (!raw || /^\d+(\.\d+)?$/.test(raw)) {
+        label = 'Consecutive Losses';
+      } else if (raw === 'consecutive_losses') {
+        label = 'Consecutive Losses';
+      } else if (raw === 'max_profit') {
+        label = 'Max Profit Reached';
+      } else if (raw === 'max_loss_count') {
+        label = 'Max Daily Losses';
+      } else if (raw === 'cooloff') {
+        label = 'Cool-off';
+      } else if (/^max_loss_\d+$/.test(raw)) {
+        const amount = raw.replace('max_loss_', '');
+        label = `Loss Limit (${amount})`;
+      }
+      if (remaining > 0) label += ` (${formatDuration(remaining)})`;
+      return label;
+    }
+
     function renderRisk(risk, systemTrading) {
       const el = document.getElementById('buyStatusLabel');
       if (systemTrading === false) {
@@ -1090,8 +1128,7 @@
         el.textContent = 'Buy Enabled';
         el.className = 'green';
       } else if (risk.buy_allowed === false) {
-        const why = risk.reason || (risk.cooloff_remaining ? `cooloff ${risk.cooloff_remaining}s` : 'locked');
-        el.textContent = `Buy Disabled — ${why}`;
+        el.textContent = `Buy Disabled — ${formatBuyLockReason(risk)}`;
         el.className = 'red';
       } else {
         el.textContent = 'Buy status: —';

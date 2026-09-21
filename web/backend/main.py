@@ -218,7 +218,9 @@ def trade_action(payload: TradeActionRequest, request: Request):
         latency.mark("after_snapshot_read")
     if payload.action == "BUY" and isinstance(risk, dict):
         if not risk.get("buy_allowed", True):
-            reason = risk.get("reason") or "buy_locked"
+            reason = str(risk.get("reason") or "buy_locked")
+            if reason.replace(".", "", 1).isdigit():
+                reason = "consecutive_losses"
             cooloff = int(risk.get("cooloff_remaining", 0) or 0)
             if cooloff > 0:
                 raise HTTPException(status_code=429, detail=f"Buy blocked: cooling off ({cooloff}s remaining)")

@@ -147,7 +147,9 @@ def evaluate_risk_state(completed_trades: List[Dict], last_exit_epoch: float = 0
 
     locked = disabled_until > now
     if locked and not reason:
-        reason = str(current_label or "locked")
+        reason = _reason_from_label(current_label)
+    if not locked and cooloff_remaining > 0 and not reason:
+        reason = "cooloff"
 
     return {
         "buy_allowed": (not locked) and cooloff_remaining == 0,
@@ -159,3 +161,23 @@ def evaluate_risk_state(completed_trades: List[Dict], last_exit_epoch: float = 0
         "highest_threshold": highest_threshold,
         "weekly_trades": len(weekly),
     }
+
+
+def _reason_from_label(label) -> str:
+    """Map buy_disabled.json last_trade_id to a stable reason code.
+
+    Consecutive-loss lockouts store the last trade epoch as last_trade_id,
+    which must not be shown raw in the UI.
+    """
+    text = str(label or "locked").strip()
+    if not text:
+        return "locked"
+    if text in {"max_profit", "max_loss_count", "consecutive_losses", "cooloff"}:
+        return text
+    if text.startswith("max_loss_"):
+        return text
+    try:
+        float(text)
+        return "consecutive_losses"
+    except ValueError:
+        return text
