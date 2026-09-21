@@ -79,7 +79,7 @@ PROGRESSIVE_LOSS_CONFIG = fetch_remote_json(PROGRESSIVE_LOSS_URL, PROGRESSIVE_LO
 
 BUY_DISABLE_MAX_LOSS = 2501 # Final hard stop if not covered by progressive config
 BUY_DISABLE_MAX_PROFIT = 2500 # Disable buying if net profit exceeds this amount
-COOL_OFF_PERIOD = 10 # seconds; minimum gap between trades
+COOL_OFF_PERIOD = int(os.getenv("COOL_OFF_PERIOD", "0"))  # seconds; minimum gap between trades (0 = disabled)
 TELEGRAM_COOL_OFF = int(os.getenv("TELEGRAM_COOL_OFF", "60"))  # seconds between telegram alerts
 
 # Telegram recipients: prefer JSON list in TELEGRAM_CONFIGS, fallback to single token/chat env vars.
