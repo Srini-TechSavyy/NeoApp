@@ -22,7 +22,7 @@
       --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 6px 16px rgba(15, 23, 42, 0.05);
       --mono-bg: #f7f9fc;
       --mono-fg: #1e293b;
-      --control-h: 30px;
+      --control-h: 28px;
     }
     *, *::before, *::after { box-sizing: border-box; }
     html { -webkit-text-size-adjust: 100%; }
@@ -54,8 +54,10 @@
     }
     .top-meta {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
-      gap: 16px;
+      justify-content: flex-end;
+      gap: 8px 14px;
       font-size: 12px;
       font-weight: 600;
       color: var(--muted);
@@ -71,7 +73,7 @@
     #connStatus.connected { color: var(--buy); }
 
     .main-container {
-      padding: 10px 12px;
+      padding: 8px 10px;
       max-width: 720px;
       margin: 0 auto;
     }
@@ -79,9 +81,9 @@
     .scalper-panel {
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 6px;
       box-shadow: var(--shadow);
-      padding: 12px 14px 10px;
+      padding: 10px 12px 8px;
       min-width: 0;
     }
 
@@ -90,17 +92,29 @@
     }
 
     .form-grid {
-      display: grid;
-      grid-template-columns: 68px 1fr;
-      gap: 8px 10px;
-      align-items: center;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: stretch;
+      min-width: 0;
     }
-    .form-grid .lbl {
-      text-align: right;
+    .trade-strip {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+    .strip-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+    }
+    .strip-lbl {
+      font-size: 11px;
+      font-weight: 650;
       color: var(--muted);
-      font-size: 12px;
-      font-weight: 600;
-      padding-right: 2px;
+      line-height: 1.2;
     }
     .row-inline {
       display: flex;
@@ -139,7 +153,7 @@
       font-weight: 750;
       letter-spacing: 0.06em;
       min-width: 96px;
-      height: 34px;
+      height: 32px;
     }
     .btn-buy:hover:not(:disabled) { background: #166534; }
     .btn-exit {
@@ -149,7 +163,7 @@
       font-weight: 750;
       letter-spacing: 0.06em;
       min-width: 96px;
-      height: 34px;
+      height: 32px;
     }
     .btn-exit:hover:not(:disabled) { background: #b91c1c; }
     .btn-ce {
@@ -169,8 +183,8 @@
     .badge-auto {
       display: inline-flex;
       align-items: center;
-      height: 28px;
-      padding: 0 10px;
+      height: 26px;
+      padding: 0 8px;
       border-radius: 999px;
       background: var(--amber-bg);
       border: 1px solid var(--amber-border);
@@ -185,47 +199,23 @@
       color: #166534;
     }
 
-    .params-readonly {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 6px 8px;
-      min-width: 0;
-    }
-    .param-pair { display: contents; }
-    .params-readonly label { font-size: 11px; color: var(--muted); font-weight: 600; }
-    .params-readonly input {
-      width: 52px;
-      text-align: center;
-      background: #f8fafc;
-      color: var(--navy);
-      font-variant-numeric: tabular-nums;
-    }
-    #tradeLots { width: 48px; background: #fff; }
-    .params-note {
-      font-size: 11px;
-      color: var(--muted);
-      font-style: italic;
-    }
+    #tradeLots { width: 56px; background: #fff; max-width: 100%; }
 
     .controls-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 6px;
       align-items: center;
-      margin: 4px 0 0;
-      grid-column: 1 / -1;
-      padding-left: 68px;
+      margin: 2px 0 0;
     }
 
     .status-bar {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 10px 14px;
-      margin: 2px 0 2px;
-      grid-column: 1 / -1;
-      padding: 8px 10px 8px 68px;
+      gap: 8px 12px;
+      margin: 0;
+      padding: 6px 8px;
       background: #f8fafc;
       border: 1px solid var(--border);
       border-radius: 6px;
@@ -256,16 +246,14 @@
     }
 
     #lastActionLine {
-      grid-column: 1 / -1;
       font-size: 11px;
       color: var(--muted);
       min-height: 1.2em;
-      padding-left: 68px;
     }
 
     .web-connect {
-      margin-top: 10px;
-      padding: 8px 10px 10px;
+      margin-top: 8px;
+      padding: 6px 8px 8px;
       border: 1px solid var(--border);
       border-radius: 6px;
       background: #f8fafc;
@@ -281,14 +269,12 @@
     .web-connect label { font-size: 12px; color: var(--muted); font-weight: 600; }
     #message { font-size: 12px; margin-top: 6px; }
     #tradeResponse {
-      grid-column: 1 / -1;
       width: 100%;
       min-width: 0;
       max-width: 100%;
       font-size: 11px;
       line-height: 1.45;
-      margin-top: 2px;
-      padding-left: 68px;
+      margin-top: 0;
       overflow-wrap: anywhere;
       white-space: normal;
       word-break: break-word;
@@ -322,6 +308,48 @@
     .controls-row .action-btns,
     .controls-row .auto-badges { min-width: 0; }
 
+    #topIndexLtp { font-variant-numeric: tabular-nums; }
+    #topClock {
+      font-variant-numeric: tabular-nums;
+      font-size: 11px;
+    }
+
+    @media (min-width: 768px) {
+      .main-container { padding: 8px 14px; }
+      .trade-strip {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 12px;
+      }
+      .strip-symbol { grid-column: 1 / -1; }
+    }
+
+    @media (min-width: 1024px) {
+      .main-container { max-width: 960px; }
+      .trade-strip {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 8px 10px;
+      }
+      .strip-strike { flex: 1 1 260px; min-width: 0; }
+      .strip-option { flex: 0 0 auto; }
+      .strip-lots { flex: 0 0 auto; }
+      .strip-symbol { flex: 1 1 220px; min-width: 160px; }
+      .controls-row {
+        flex-wrap: nowrap;
+        justify-content: space-between;
+      }
+      .action-btns { flex: 0 0 auto; }
+      .auto-badges { flex: 1 1 auto; justify-content: flex-end; }
+      #indexLtpLive.header-ltp { display: none; }
+    }
+
+    @media (min-width: 1440px) {
+      .main-container { max-width: 1040px; }
+    }
+
     @media (max-width: 600px) {
       body {
         font-size: 13px;
@@ -344,7 +372,8 @@
         grid-template-columns: minmax(0, 1fr) auto;
         grid-template-areas:
           "actual net"
-          "brok conn";
+          "brok conn"
+          "ltp time";
         gap: 2px 8px;
         font-size: 11px;
         min-width: 0;
@@ -356,6 +385,8 @@
         text-align: left;
       }
       #connStatus { grid-area: conn; justify-self: end; }
+      #topIndexLtp { grid-area: ltp; }
+      #topClock { grid-area: time; justify-self: end; }
       .top-meta > span {
         min-width: 0;
         white-space: nowrap;
@@ -372,26 +403,6 @@
         max-width: 100%;
         padding: 10px 12px 8px;
         overflow-x: clip;
-      }
-
-      .form-grid {
-        grid-template-columns: 52px minmax(0, 1fr);
-        gap: 6px 8px;
-        align-items: center;
-        width: 100%;
-        min-width: 0;
-      }
-      .form-grid > * {
-        min-width: 0;
-        max-width: 100%;
-      }
-      .form-grid .lbl {
-        text-align: left;
-        font-size: 11px;
-        padding-right: 0;
-        align-self: start;
-        padding-top: 8px;
-        line-height: 1.2;
       }
 
       .row-inline {
@@ -450,33 +461,10 @@
         min-width: 0;
       }
 
-      .params-readonly {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px 10px;
-        align-items: center;
-        width: 100%;
-      }
-      .param-pair {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: 4px 6px;
-        align-items: center;
-        min-width: 0;
-      }
-      .params-readonly label {
-        white-space: nowrap;
-      }
-      .params-readonly input,
       #tradeLots {
         width: 100%;
         min-width: 0;
         max-width: 100%;
-      }
-      .params-note {
-        grid-column: 1 / -1;
-        margin: 0;
-        overflow-wrap: anywhere;
       }
 
       .symbol-row {
@@ -490,7 +478,6 @@
       }
 
       .controls-row {
-        padding-left: 0;
         margin: 2px 0 0;
         display: flex;
         flex-direction: column;
@@ -536,11 +523,6 @@
         align-items: flex-start;
         flex-direction: column;
       }
-      .status-bar,
-      #lastActionLine,
-      #tradeResponse {
-        padding-left: 0;
-      }
       #buyStatusLabel,
       #positionLabel,
       #strategyLabel,
@@ -558,7 +540,6 @@
 
       #lastActionLine,
       #tradeResponse {
-        padding-left: 0;
         overflow-wrap: anywhere;
         word-break: break-word;
       }
@@ -605,9 +586,6 @@
     }
 
     @media (max-width: 360px) {
-      .params-readonly {
-        grid-template-columns: 1fr;
-      }
       .badge-auto {
         font-size: 10px;
         padding: 4px 5px;
@@ -622,6 +600,8 @@
       <span id="topActualWrap">Actual PnL: <span id="topActualPnl">—</span></span>
       <span id="topNetWrap">Net PnL: <span id="topNetPnl">—</span></span>
       <span id="topBrokerageWrap">Brokerage: <span id="topBrokerage">—</span></span>
+      <span id="topIndexLtp" class="muted">LTP: —</span>
+      <span id="topClock" class="muted" aria-hidden="true"></span>
       <span id="connStatus" class="disconnected">Offline</span>
     </div>
   </header>
@@ -629,60 +609,45 @@
   <div class="main-container">
     <section class="scalper-panel">
       <div class="form-grid">
-        <span class="lbl">Strike:</span>
-        <div class="row-inline strike-row">
-          <button type="button" class="btn-sm" id="strikeUp" title="Bump strike">▲</button>
-          <button type="button" class="btn-sm" id="strikeDown" title="Lower strike">▼</button>
-          <label class="muted offset-label">Offset</label>
-          <select id="strikeOffset">
-            <option value="0">ATM</option>
-          </select>
-          <button type="button" id="suggestBtn">Suggest</button>
-          <span id="indexLtpLive" class="muted na-tag"></span>
-        </div>
-
-        <span class="lbl">Option:</span>
-        <div class="option-row">
-          <button type="button" id="cePeBtn" class="btn-ce">CE</button>
-        </div>
-
-        <span class="lbl">Params:</span>
-        <div class="params-readonly">
-          <div class="param-pair">
-            <label>Lots</label>
-            <input id="tradeLots" type="number" min="1" step="1" value="1" />
+        <div class="trade-strip">
+          <div class="strip-cell strip-strike">
+            <span class="strip-lbl">Strike</span>
+            <div class="row-inline strike-row">
+              <button type="button" class="btn-sm" id="strikeUp" title="Bump strike">▲</button>
+              <button type="button" class="btn-sm" id="strikeDown" title="Lower strike">▼</button>
+              <label class="muted offset-label">Offset</label>
+              <select id="strikeOffset">
+                <option value="0">ATM</option>
+              </select>
+              <button type="button" id="suggestBtn">Suggest</button>
+              <span id="indexLtpLive" class="muted na-tag header-ltp"></span>
+            </div>
           </div>
-          <div class="param-pair">
-            <label>Tgt</label>
-            <input id="paramTgt" readonly title="From worker snapshot" placeholder="—" />
+          <div class="strip-cell strip-option">
+            <span class="strip-lbl">Type</span>
+            <div class="option-row">
+              <button type="button" id="cePeBtn" class="btn-ce">CE</button>
+            </div>
           </div>
-          <div class="param-pair">
-            <label>SL</label>
-            <input id="paramSl" readonly placeholder="—" />
+          <div class="strip-cell strip-lots">
+            <span class="strip-lbl">Lots</span>
+            <input id="tradeLots" type="number" min="1" step="1" value="1" aria-label="Lots" />
           </div>
-          <div class="param-pair">
-            <label>Trl</label>
-            <input id="paramTrl" readonly placeholder="—" />
+          <div class="strip-cell strip-symbol">
+            <span class="strip-lbl">Symbol</span>
+            <div class="row-inline symbol-row">
+              <input id="tradeSymbol" type="text" placeholder="NIFTY26AUG25000CE" />
+              <select id="baseSymbol" style="display:none" aria-hidden="true">
+                <option value="NIFTY">NIFTY</option>
+                <option value="BANKNIFTY">BANKNIFTY</option>
+                <option value="SENSEX">SENSEX</option>
+                <option value="FINNIFTY">FINNIFTY</option>
+                <option value="BANKEX">BANKEX</option>
+              </select>
+              <input id="indexLtp" type="hidden" />
+              <input id="optionType" type="hidden" value="CE" />
+            </div>
           </div>
-          <div class="param-pair">
-            <label>PT</label>
-            <input id="paramPt" readonly placeholder="—" />
-          </div>
-          <span id="paramsNote" class="params-note">Server params appear after Connect</span>
-        </div>
-
-        <span class="lbl">Symbol:</span>
-        <div class="row-inline symbol-row">
-          <input id="tradeSymbol" type="text" placeholder="NIFTY26AUG25000CE" />
-          <select id="baseSymbol" style="display:none" aria-hidden="true">
-            <option value="NIFTY">NIFTY</option>
-            <option value="BANKNIFTY">BANKNIFTY</option>
-            <option value="SENSEX">SENSEX</option>
-            <option value="FINNIFTY">FINNIFTY</option>
-            <option value="BANKEX">BANKEX</option>
-          </select>
-          <input id="indexLtp" type="hidden" />
-          <input id="optionType" type="hidden" value="CE" />
         </div>
 
         <div class="controls-row">
@@ -1017,32 +982,16 @@
     }
 
     function renderAutomation(auto) {
-      const tgt = document.getElementById('paramTgt');
-      const sl = document.getElementById('paramSl');
-      const trl = document.getElementById('paramTrl');
-      const pt = document.getElementById('paramPt');
-      const note = document.getElementById('paramsNote');
       const ab = document.getElementById('autoBuyBadge');
       const as = document.getElementById('autoSellBadge');
 
       if (!auto || typeof auto !== 'object') {
-        tgt.value = '';
-        sl.value = '';
-        trl.value = '';
-        pt.value = '';
-        note.style.display = 'inline';
         ab.textContent = 'AUTO BUY: —';
         as.textContent = 'AUTO SELL: —';
         ab.classList.remove('on');
         as.classList.remove('on');
         return;
       }
-
-      note.style.display = 'none';
-      tgt.value = auto.target ?? '';
-      sl.value = auto.sl ?? '';
-      trl.value = auto.trail_step ?? '';
-      pt.value = auto.profit_trail_step ?? '';
 
       const buyOn = !!auto.auto_buy_enabled;
       const sellOn = !!auto.auto_sell_enabled;
@@ -1111,16 +1060,20 @@
       const risk = data.risk || {};
       const position = data.position || {};
       const idxLive = document.getElementById('indexLtpLive');
+      const topLtp = document.getElementById('topIndexLtp');
 
       if (indicator.index_ltp != null && Number(indicator.index_ltp) > 0) {
         const name = indicator.index_name ? `${indicator.index_name} ` : '';
-        idxLive.textContent = `${name}LTP ${Number(indicator.index_ltp).toFixed(2)} (snapshot)`;
+        const ltpText = `${name}LTP ${Number(indicator.index_ltp).toFixed(2)}`;
+        idxLive.textContent = `${ltpText} (snapshot)`;
+        if (topLtp) topLtp.textContent = ltpText;
         document.getElementById('indexLtp').value = indicator.index_ltp;
         const manual = document.getElementById('indexLtpManual');
         if (manual && !manual.matches(':focus')) manual.value = indicator.index_ltp;
         document.getElementById('baseSymbol').value = inferBaseSymbol(indicator.index_name || tradeSymbolEl.value);
       } else {
         idxLive.textContent = 'Index LTP: — (enter manually for Suggest)';
+        if (topLtp) topLtp.textContent = 'LTP: —';
       }
 
       renderAutomation(data.automation);
@@ -1507,6 +1460,16 @@
     }
     tokenEl.value = saved;
     syncCePeButton();
+
+    (function startTopClock() {
+      const el = document.getElementById('topClock');
+      if (!el) return;
+      const tick = () => {
+        el.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      };
+      tick();
+      setInterval(tick, 1000);
+    })();
   </script>
 </body>
 </html>
