@@ -19,6 +19,7 @@ from web.shared.monitor_snapshot import build_monitor_snapshot
 from web.shared.risk_controls import evaluate_risk_state
 from web.shared.symbol_helpers import get_underlying_index, suggest_option_symbol
 from web.shared.state_store import write_snapshot
+from web.shared.trade_orders import refresh_pending_orders
 from web.shared.trading_actions import execute_market_action
 
 POLL_SECONDS = int(os.getenv("WEB_POLL_SECONDS", "5"))
@@ -192,6 +193,16 @@ def _suggest_symbol_for_signal(index_name: str, idx_ltp: float, signal: str):
 
 
 def _run_once(client, manager: LiveScalpingManager, runtime_state: dict):
+    pending_meta = {}
+    pending_orders = refresh_pending_orders(client, latency_meta=pending_meta)
+    if pending_meta:
+        logger.info(
+            "Worker pending order refresh: count=%s updates=%s ms=%s",
+            pending_meta.get("pending_order_count"),
+            pending_meta.get("pending_order_updates"),
+            pending_meta.get("pending_order_refresh_ms"),
+        )
+
     report = client.order_report()
     report_data = report.get("data", []) if isinstance(report, dict) else (report or [])
 
@@ -303,6 +314,7 @@ def _run_once(client, manager: LiveScalpingManager, runtime_state: dict):
     snapshot["risk"] = risk
     snapshot["automation"] = auto_info
     snapshot["last_action"] = action_msg
+    snapshot["pending_orders"] = pending_orders
     snapshot["source"] = "worker"
     snapshot["poll_seconds"] = POLL_SECONDS
 

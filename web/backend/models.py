@@ -7,6 +7,7 @@ class TradeActionRequest(BaseModel):
     trading_symbol: str = Field(min_length=5, max_length=40)
     lots: int = Field(default=1, ge=1, le=500)
     action: Literal["BUY", "EXIT"]
+    client_request_id: Optional[str] = Field(default=None, min_length=8, max_length=64)
 
 
 class TradeActionResponse(BaseModel):
@@ -14,6 +15,7 @@ class TradeActionResponse(BaseModel):
     action: str
     trading_symbol: str
     lots: int
+    request_id: Optional[str] = None
     broker_response: Dict[str, Any]
 
 

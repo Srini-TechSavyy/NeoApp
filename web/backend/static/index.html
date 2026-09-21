@@ -736,6 +736,9 @@
     const tradeLotsEl = document.getElementById('tradeLots');
     const tradeStatusEl = document.getElementById('tradeStatus');
     const tradeResponseEl = document.getElementById('tradeResponse');
+    let trackedPendingOrderId = null;
+    let trackedPendingAction = null;
+    let tradeInFlight = false;
     const buyBtn = document.getElementById('buyBtn');
     const exitBtn = document.getElementById('exitBtn');
     const suggestBtn = document.getElementById('suggestBtn');
@@ -1077,6 +1080,8 @@
       if (data.last_action) {
         appendLog(data.last_action);
       }
+
+      applyPendingOrderSnapshot(data.pending_orders);
     }
 
     function renderSystemStatus(status) {
@@ -1124,48 +1129,110 @@
       const statusRaw = broker.status ?? raw.ordSt ?? raw.stat ?? raw.status ?? '';
       const statusNorm = String(statusRaw).toLowerCase().trim();
       const rejected = statusNorm === 'rejected' || statusNorm === 'reject';
+      const cancelled = statusNorm === 'cancelled' || statusNorm === 'canceled';
 
       const symbol = String(broker.symbol || payload?.trading_symbol || '').trim();
       const lots = broker.lots ?? payload?.lots;
 
-      if (rejected) {
-        const reqLabel = action === 'EXIT' ? 'EXIT request rejected' : `${action} request rejected`;
+      if (rejected || cancelled) {
+        const reqLabel = action === 'EXIT' ? 'EXIT rejected' : `${action} rejected`;
         const brokerStatus = statusNorm || 'rejected';
         return {
-          message: `${reqLabel} | Order ID: ${orderIdStr} | Broker status: ${brokerStatus}`,
+          message: `${reqLabel} — Order ID: ${orderIdStr} (${brokerStatus})`,
           cls: 'red',
           rejected: true,
+          completed: false,
+          pendingFill: false,
+          orderId: orderIdStr,
         };
       }
 
-      const chunks = [];
-      if (action === 'EXIT') {
-        chunks.push('Order response received: EXIT');
-      } else {
-        let head = 'Order response received: BUY';
-        if (symbol) head += ` ${symbol}`;
-        chunks.push(head);
-      }
-      chunks.push(`Order ID: ${orderIdStr}`);
-
-      if (statusNorm && statusNorm !== 'unknown') {
-        chunks.push(`Status: ${statusRaw}`);
-      }
-      const execPrice = broker.execution_price;
-      if (execPrice != null && execPrice !== '' && Number.isFinite(Number(execPrice)) && Number(execPrice) > 0) {
-        chunks.push(`Exec: ${execPrice}`);
-      }
-      if (action === 'BUY' && Number.isFinite(lots) && lots >= 1) {
-        chunks.push(`Lots: ${lots}`);
-      }
-
       const completed = broker.completed === true || statusNorm === 'complete';
-      const cls = completed ? 'green' : (statusNorm ? 'muted' : 'green');
+      const submitted = broker.submitted === true || statusNorm === 'submitted';
+      const pendingFill = !completed && !rejected && orderIdStr !== '—';
 
-      return { message: chunks.join(' | '), cls, rejected: false, completed };
+      if (completed) {
+        const execPrice = broker.execution_price;
+        let msg = action === 'EXIT'
+          ? `EXIT filled — Order ID: ${orderIdStr}`
+          : `BUY filled — Order ID: ${orderIdStr}`;
+        if (execPrice != null && Number(execPrice) > 0) msg += ` @ ${execPrice}`;
+        return { message: msg, cls: 'green', rejected: false, completed: true, pendingFill: false, orderId: orderIdStr };
+      }
+
+      if (pendingFill) {
+        const head = action === 'EXIT' ? 'EXIT submitted' : (symbol ? `BUY submitted — ${symbol}` : 'BUY submitted');
+        const msg = `${head} — Order ID: ${orderIdStr} — Awaiting fill confirmation`;
+        return {
+          message: msg,
+          cls: 'muted',
+          rejected: false,
+          completed: false,
+          pendingFill: true,
+          orderId: orderIdStr,
+        };
+      }
+
+      const brokerMsg = broker.message || (submitted ? 'Order submitted; awaiting fill confirmation' : '');
+      const msg = brokerMsg
+        ? `${action} — ${brokerMsg} — Order ID: ${orderIdStr}`
+        : `${action} acknowledged — Order ID: ${orderIdStr}`;
+      return { message: msg, cls: 'muted', rejected: false, completed: false, pendingFill: submitted, orderId: orderIdStr };
+    }
+
+    function formatPendingOrderUpdate(row) {
+      if (!row || !row.order_id) return null;
+      const action = row.action === 'EXIT' || row.side === 'SELL' ? 'EXIT' : 'BUY';
+      const orderIdStr = String(row.order_id);
+      const status = String(row.status || '').toLowerCase();
+      if (status === 'complete' || row.completed === true) {
+        const px = row.execution_price;
+        let msg = action === 'EXIT'
+          ? `EXIT filled — Order ID: ${orderIdStr}`
+          : `BUY filled — Order ID: ${orderIdStr}`;
+        if (px != null && Number(px) > 0) msg += ` @ ${px}`;
+        return { message: msg, cls: 'green', completed: true, pendingFill: false };
+      }
+      if (status === 'rejected') {
+        return { message: `${action} rejected — Order ID: ${orderIdStr}`, cls: 'red', completed: false, pendingFill: false };
+      }
+      if (status === 'cancelled') {
+        return { message: `${action} cancelled — Order ID: ${orderIdStr}`, cls: 'red', completed: false, pendingFill: false };
+      }
+      const head = action === 'EXIT' ? 'EXIT submitted' : 'BUY submitted';
+      return {
+        message: `${head} — Order ID: ${orderIdStr} — Awaiting fill confirmation`,
+        cls: 'muted',
+        completed: false,
+        pendingFill: true,
+      };
+    }
+
+    function applyPendingOrderSnapshot(pendingOrders) {
+      if (!trackedPendingOrderId || !Array.isArray(pendingOrders)) return;
+      const row = pendingOrders.find((o) => String(o.order_id) === String(trackedPendingOrderId));
+      if (!row) return;
+      const summary = formatPendingOrderUpdate(row);
+      if (!summary) return;
+      setTradeResult(summary.message, summary.cls);
+      if (summary.completed) {
+        tradeStatusEl.textContent = 'Filled';
+        tradeStatusEl.className = 'green';
+        trackedPendingOrderId = null;
+        trackedPendingAction = null;
+      } else if (summary.cls === 'red') {
+        tradeStatusEl.textContent = 'Rejected';
+        tradeStatusEl.className = 'red';
+        trackedPendingOrderId = null;
+        trackedPendingAction = null;
+      } else {
+        tradeStatusEl.textContent = 'Awaiting fill confirmation';
+        tradeStatusEl.className = 'muted';
+      }
     }
 
     async function executeTrade(action) {
+      if (tradeInFlight) return;
       const token = tokenEl.value.trim();
       const trading_symbol = tradeSymbolEl.value.trim().toUpperCase();
       const lots = Number(tradeLotsEl.value || '0');
@@ -1179,14 +1246,29 @@
         return;
       }
 
+      tradeInFlight = true;
       setTradeBusy(true, `${action} in progress...`);
       setTradeResult('Sending order...', 'muted');
 
+      const client_request_id = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `web-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+      const clientT0 = performance.now();
       try {
         const r = await fetch('/api/trade/action', {
           method: 'POST',
           headers: _headers(token),
-          body: JSON.stringify({ trading_symbol, lots, action })
+          body: JSON.stringify({ trading_symbol, lots, action, client_request_id })
+        });
+        const clientRoundTripMs = Math.round(performance.now() - clientT0);
+        const serverMs = r.headers.get('X-Trade-Server-Ms');
+        const requestId = r.headers.get('X-Trade-Request-Id');
+        console.info('[trade/latency]', {
+          action,
+          clientRoundTripMs,
+          serverMs: serverMs != null ? Number(serverMs) : null,
+          requestId,
         });
 
         const payload = await r.json().catch(() => ({}));
@@ -1202,14 +1284,25 @@
 
         const summary = formatTradeOrderResponse(action, payload);
         setTradeResult(summary.message, summary.cls);
+        if (summary.orderId && summary.orderId !== '—') {
+          trackedPendingOrderId = summary.orderId;
+          trackedPendingAction = action;
+        }
         if (summary.rejected) {
           tradeStatusEl.textContent = 'Rejected';
           tradeStatusEl.className = 'red';
+          trackedPendingOrderId = null;
+          trackedPendingAction = null;
         } else if (summary.completed) {
-          tradeStatusEl.textContent = 'Success';
+          tradeStatusEl.textContent = 'Filled';
           tradeStatusEl.className = 'green';
+          trackedPendingOrderId = null;
+          trackedPendingAction = null;
+        } else if (summary.pendingFill) {
+          tradeStatusEl.textContent = 'Awaiting fill confirmation';
+          tradeStatusEl.className = 'muted';
         } else {
-          tradeStatusEl.textContent = 'Submitted';
+          tradeStatusEl.textContent = 'Acknowledged';
           tradeStatusEl.className = 'muted';
         }
       } catch (e) {
@@ -1217,6 +1310,7 @@
         tradeStatusEl.textContent = 'Failed';
         tradeStatusEl.className = 'red';
       } finally {
+        tradeInFlight = false;
         setTradeBusy(false);
       }
     }

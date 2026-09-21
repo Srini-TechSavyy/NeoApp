@@ -3,7 +3,9 @@ import hashlib
 import logging
 import os
 import socket
+import time
 from datetime import datetime
+from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -11,7 +13,7 @@ from common.utils import get_resource_path
 
 load_dotenv(get_resource_path(".env"))
 
-from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -34,6 +36,13 @@ from web.backend.models import (
 )
 from web.shared.symbol_helpers import suggest_option_symbol
 from web.shared.state_store import read_snapshot
+from web.shared.trade_latency import TradeLatencyRecorder, latency_enabled
+from web.shared.trade_orders import (
+    abort_idempotent_trade,
+    begin_idempotent_trade,
+    complete_idempotent_trade,
+    register_pending_order,
+)
 from web.shared.trading_actions import execute_market_action
 
 app = FastAPI(title="NeoApp Web API", version="0.1.0")
@@ -53,6 +62,28 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 WORKER_HEALTH_WINDOW_SECONDS = int(os.getenv("WORKER_HEALTH_WINDOW_SECONDS", "30"))
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.middleware("http")
+async def trade_action_latency_middleware(request: Request, call_next):
+    if request.url.path != "/api/trade/action" or not latency_enabled():
+        return await call_next(request)
+
+    recorder = TradeLatencyRecorder()
+    request.state.trade_latency = recorder
+    t0 = time.perf_counter()
+    response = await call_next(request)
+    wall_ms = round((time.perf_counter() - t0) * 1000, 1)
+    recorder.stages["http_wall_including_auth_ms"] = wall_ms
+    logger.info(
+        "trade_latency_http_wall request_id=%s wall_ms=%.1f handler_total_ms=%.1f",
+        recorder.request_id,
+        wall_ms,
+        recorder.total_ms(),
+    )
+    response.headers["X-Trade-Request-Id"] = recorder.request_id
+    response.headers["X-Trade-Server-Ms"] = str(recorder.total_ms())
+    return response
 
 
 @app.get("/")
@@ -141,12 +172,20 @@ def monitor_snapshot():
 
 
 @app.post("/api/trade/action", dependencies=[Depends(require_api_key)], response_model=TradeActionResponse)
-def trade_action(payload: TradeActionRequest):
+def trade_action(payload: TradeActionRequest, request: Request):
+    latency: Optional[TradeLatencyRecorder] = getattr(request.state, "trade_latency", None)
+    if latency:
+        latency.mark("fastapi_handler_start")
+
     if not is_trading_enabled():
         raise HTTPException(status_code=403, detail="Trading is disabled. Set TRADING_ENABLED=true to enable live orders.")
+    if latency:
+        latency.mark("after_trading_enabled_check")
 
     snapshot = read_snapshot()
     risk = snapshot.get("risk", {}) if isinstance(snapshot, dict) else {}
+    if latency:
+        latency.mark("after_snapshot_read")
     if payload.action == "BUY" and isinstance(risk, dict):
         if not risk.get("buy_allowed", True):
             reason = risk.get("reason") or "buy_locked"
@@ -154,23 +193,76 @@ def trade_action(payload: TradeActionRequest):
             if cooloff > 0:
                 raise HTTPException(status_code=429, detail=f"Buy blocked: cooling off ({cooloff}s remaining)")
             raise HTTPException(status_code=429, detail=f"Buy blocked by risk controls: {reason}")
+    if latency:
+        latency.mark("after_risk_checks")
 
     side = "BUY" if payload.action == "BUY" else "SELL"
+    request_id = latency.request_id if latency else None
+    client_request_id = (payload.client_request_id or "").strip() or None
+
+    cached_response = None
+    if client_request_id:
+        try:
+            cached_response = begin_idempotent_trade(client_request_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        if cached_response:
+            if latency:
+                latency.add_meta(idempotent_replay=True, client_request_id=client_request_id)
+                latency.mark("idempotent_cache_hit")
+                latency.flush(action=payload.action, symbol=payload.trading_symbol)
+            return TradeActionResponse(**cached_response)
+
     try:
-        resp = execute_market_action(payload.trading_symbol, payload.lots, side)
+        resp = execute_market_action(
+            payload.trading_symbol,
+            payload.lots,
+            side,
+            latency=latency,
+            wait_for_completion=False,
+        )
     except ValueError as exc:
+        if client_request_id:
+            abort_idempotent_trade(client_request_id)
+        if latency:
+            latency.flush(action=payload.action, symbol=payload.trading_symbol)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
+        if client_request_id:
+            abort_idempotent_trade(client_request_id)
+        if latency:
+            latency.flush(action=payload.action, symbol=payload.trading_symbol)
         logger.exception("Trade action failed")
         raise HTTPException(status_code=500, detail=f"Trade action failed: {exc}") from exc
 
-    return TradeActionResponse(
+    order_id = str(resp.get("order_id", ""))
+    if order_id:
+        register_pending_order(
+            request_id=request_id or "",
+            order_id=order_id,
+            symbol=str(resp.get("symbol") or payload.trading_symbol),
+            side=str(resp.get("side") or side),
+            lots=int(resp.get("lots") or payload.lots),
+            client_request_id=client_request_id,
+            action=payload.action,
+        )
+
+    api_response = TradeActionResponse(
         ok=True,
         action=payload.action,
         trading_symbol=payload.trading_symbol,
         lots=payload.lots,
+        request_id=request_id,
         broker_response=resp if isinstance(resp, dict) else {"raw": str(resp)},
     )
+    if client_request_id:
+        complete_idempotent_trade(client_request_id, api_response.model_dump())
+
+    if latency:
+        latency.mark("before_immediate_response")
+        latency.flush(action=payload.action, symbol=payload.trading_symbol)
+
+    return api_response
 
 
 @app.post("/api/symbol/suggest", dependencies=[Depends(require_api_key)], response_model=SuggestSymbolResponse)
