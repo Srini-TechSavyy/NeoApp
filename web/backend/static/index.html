@@ -104,6 +104,22 @@
       gap: 6px;
       min-width: 0;
     }
+    .strip-controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 6px 8px;
+      width: 100%;
+      min-width: 0;
+    }
+    .strip-controls-row .strip-strike {
+      flex: 1 1 200px;
+      min-width: 0;
+    }
+    .strip-controls-row .strip-option,
+    .strip-controls-row .strip-lots {
+      flex: 0 0 auto;
+    }
     .strip-cell {
       display: flex;
       flex-direction: column;
@@ -316,12 +332,6 @@
 
     @media (min-width: 768px) {
       .main-container { padding: 8px 14px; }
-      .trade-strip {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px 12px;
-      }
-      .strip-symbol { grid-column: 1 / -1; }
     }
 
     @media (min-width: 1024px) {
@@ -333,6 +343,7 @@
         align-items: flex-end;
         gap: 8px 10px;
       }
+      .strip-controls-row { display: contents; }
       .strip-strike { flex: 1 1 260px; min-width: 0; }
       .strip-option { flex: 0 0 auto; }
       .strip-lots { flex: 0 0 auto; }
@@ -453,6 +464,43 @@
         width: 100%;
         overflow-wrap: anywhere;
         word-break: break-word;
+      }
+
+      .strip-controls-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto auto;
+        align-items: end;
+        gap: 6px;
+      }
+      .strip-controls-row .strip-strike {
+        flex: none;
+        min-width: 0;
+      }
+      .strip-controls-row .strike-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        min-width: 0;
+      }
+      .strip-controls-row .strike-row .btn-sm {
+        width: auto;
+        min-width: 30px;
+      }
+      .strip-controls-row #strikeOffset {
+        width: 88px;
+        max-width: 100%;
+        flex: 1 1 72px;
+        min-width: 0;
+      }
+      .strip-controls-row #suggestBtn {
+        margin-left: 0;
+        width: auto;
+      }
+      .strip-controls-row #indexLtpLive {
+        width: auto;
+        flex: 1 1 100%;
       }
 
       .option-row #cePeBtn,
@@ -610,28 +658,30 @@
     <section class="scalper-panel">
       <div class="form-grid">
         <div class="trade-strip">
-          <div class="strip-cell strip-strike">
-            <span class="strip-lbl">Strike</span>
-            <div class="row-inline strike-row">
-              <button type="button" class="btn-sm" id="strikeUp" title="Bump strike">▲</button>
-              <button type="button" class="btn-sm" id="strikeDown" title="Lower strike">▼</button>
-              <label class="muted offset-label">Offset</label>
-              <select id="strikeOffset">
-                <option value="0">ATM</option>
-              </select>
-              <button type="button" id="suggestBtn">Suggest</button>
-              <span id="indexLtpLive" class="muted na-tag header-ltp"></span>
+          <div class="strip-controls-row">
+            <div class="strip-cell strip-strike">
+              <span class="strip-lbl">Strike</span>
+              <div class="row-inline strike-row">
+                <button type="button" class="btn-sm" id="strikeUp" title="Bump strike">▲</button>
+                <button type="button" class="btn-sm" id="strikeDown" title="Lower strike">▼</button>
+                <label class="muted offset-label">Offset</label>
+                <select id="strikeOffset">
+                  <option value="0">ATM</option>
+                </select>
+                <button type="button" id="suggestBtn">Suggest</button>
+                <span id="indexLtpLive" class="muted na-tag header-ltp"></span>
+              </div>
             </div>
-          </div>
-          <div class="strip-cell strip-option">
-            <span class="strip-lbl">Type</span>
-            <div class="option-row">
-              <button type="button" id="cePeBtn" class="btn-ce">CE</button>
+            <div class="strip-cell strip-option">
+              <span class="strip-lbl">Type</span>
+              <div class="option-row">
+                <button type="button" id="cePeBtn" class="btn-ce">CE</button>
+              </div>
             </div>
-          </div>
-          <div class="strip-cell strip-lots">
-            <span class="strip-lbl">Lots</span>
-            <input id="tradeLots" type="number" min="1" step="1" value="1" aria-label="Lots" />
+            <div class="strip-cell strip-lots">
+              <span class="strip-lbl">Lots</span>
+              <input id="tradeLots" type="number" min="1" step="1" value="1" aria-label="Lots" />
+            </div>
           </div>
           <div class="strip-cell strip-symbol">
             <span class="strip-lbl">Symbol</span>
