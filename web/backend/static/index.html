@@ -108,23 +108,40 @@
       display: flex;
       flex-wrap: wrap;
       align-items: flex-end;
+      justify-content: flex-start;
       gap: 6px 8px;
       width: 100%;
       min-width: 0;
     }
     .strip-controls-row .strip-strike {
-      flex: 1 1 200px;
+      flex: 1 1 100%;
       min-width: 0;
     }
     .strip-controls-row .strip-option,
-    .strip-controls-row .strip-lots {
+    .strip-controls-row .strip-suggest {
       flex: 0 0 auto;
     }
     .strip-cell {
       display: flex;
       flex-direction: column;
+      align-items: flex-start;
       gap: 3px;
       min-width: 0;
+    }
+    .strip-symbol-lots {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: flex-end;
+      gap: 8px;
+      width: 100%;
+      min-width: 0;
+    }
+    .strip-symbol-lots .strip-symbol {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .strip-symbol-lots .strip-lots {
+      flex: 0 0 auto;
     }
     .strip-lbl {
       font-size: 11px;
@@ -312,8 +329,8 @@
     }
     .strike-row .offset-label { font-size: 11px; margin-left: 6px; }
     #strikeOffset { width: 88px; }
-    #suggestBtn { margin-left: 8px; }
-    #tradeSymbol { min-width: 240px; flex: 1; }
+    #suggestBtn { margin-left: 0; }
+    #tradeSymbol { min-width: 0; width: 100%; flex: 1; }
     #token { min-width: 220px; }
     #indexLtpManual { width: 180px; }
     .ltp-hint { font-size: 11px; }
@@ -344,10 +361,11 @@
         gap: 8px 10px;
       }
       .strip-controls-row { display: contents; }
-      .strip-strike { flex: 1 1 260px; min-width: 0; }
+      .strip-strike { flex: 0 1 auto; min-width: 0; }
       .strip-option { flex: 0 0 auto; }
-      .strip-lots { flex: 0 0 auto; }
-      .strip-symbol { flex: 1 1 220px; min-width: 160px; }
+      .strip-suggest { flex: 0 0 auto; }
+      .strip-symbol-lots { flex: 1 1 280px; min-width: 220px; }
+      .strip-symbol { flex: 1 1 auto; min-width: 0; }
       .controls-row {
         flex-wrap: nowrap;
         justify-content: space-between;
@@ -427,7 +445,6 @@
         grid-template-areas:
           "up down offsetSelect"
           "offsetLabel offsetLabel offsetLabel"
-          "suggest suggest suggest"
           "ltp ltp ltp";
         align-items: center;
         gap: 6px;
@@ -454,10 +471,8 @@
         max-width: none;
       }
       #suggestBtn {
-        grid-area: suggest;
         margin-left: 0;
         width: 100%;
-        justify-self: stretch;
       }
       #indexLtpLive {
         grid-area: ltp;
@@ -467,13 +482,15 @@
       }
 
       .strip-controls-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto auto;
-        align-items: end;
-        gap: 6px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        align-items: flex-end;
+        gap: 6px 8px;
       }
       .strip-controls-row .strip-strike {
-        flex: none;
+        flex: 1 1 100%;
+        width: 100%;
         min-width: 0;
       }
       .strip-controls-row .strike-row {
@@ -505,12 +522,12 @@
 
       .option-row #cePeBtn,
       #cePeBtn {
-        width: 100%;
-        min-width: 0;
+        width: auto;
+        min-width: 76px;
       }
 
       #tradeLots {
-        width: 100%;
+        width: 56px;
         min-width: 0;
         max-width: 100%;
       }
@@ -668,7 +685,6 @@
                 <select id="strikeOffset">
                   <option value="0">ATM</option>
                 </select>
-                <button type="button" id="suggestBtn">Suggest</button>
                 <span id="indexLtpLive" class="muted na-tag header-ltp"></span>
               </div>
             </div>
@@ -678,24 +694,30 @@
                 <button type="button" id="cePeBtn" class="btn-ce">CE</button>
               </div>
             </div>
+            <div class="strip-cell strip-suggest">
+              <span class="strip-lbl strip-lbl-spacer" aria-hidden="true">&nbsp;</span>
+              <button type="button" id="suggestBtn">Suggest</button>
+            </div>
+          </div>
+          <div class="strip-symbol-lots">
+            <div class="strip-cell strip-symbol">
+              <span class="strip-lbl">Symbol</span>
+              <div class="row-inline symbol-row">
+                <input id="tradeSymbol" type="text" placeholder="NIFTY26AUG25000CE" />
+                <select id="baseSymbol" style="display:none" aria-hidden="true">
+                  <option value="NIFTY">NIFTY</option>
+                  <option value="BANKNIFTY">BANKNIFTY</option>
+                  <option value="SENSEX">SENSEX</option>
+                  <option value="FINNIFTY">FINNIFTY</option>
+                  <option value="BANKEX">BANKEX</option>
+                </select>
+                <input id="indexLtp" type="hidden" />
+                <input id="optionType" type="hidden" value="CE" />
+              </div>
+            </div>
             <div class="strip-cell strip-lots">
               <span class="strip-lbl">Lots</span>
               <input id="tradeLots" type="number" min="1" step="1" value="1" aria-label="Lots" />
-            </div>
-          </div>
-          <div class="strip-cell strip-symbol">
-            <span class="strip-lbl">Symbol</span>
-            <div class="row-inline symbol-row">
-              <input id="tradeSymbol" type="text" placeholder="NIFTY26AUG25000CE" />
-              <select id="baseSymbol" style="display:none" aria-hidden="true">
-                <option value="NIFTY">NIFTY</option>
-                <option value="BANKNIFTY">BANKNIFTY</option>
-                <option value="SENSEX">SENSEX</option>
-                <option value="FINNIFTY">FINNIFTY</option>
-                <option value="BANKEX">BANKEX</option>
-              </select>
-              <input id="indexLtp" type="hidden" />
-              <input id="optionType" type="hidden" value="CE" />
             </div>
           </div>
         </div>
@@ -787,6 +809,7 @@
         opt.textContent = i === 0 ? 'ATM' : `ATM ${i > 0 ? '+' : ''}${i}`;
         strikeOffsetEl.appendChild(opt);
       }
+      strikeOffsetEl.value = '0';
     }
     initOffsetOptions();
 
