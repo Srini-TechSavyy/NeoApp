@@ -201,6 +201,29 @@ class TradePayloadAndFrontendTests(unittest.TestCase):
             html,
         )
 
+    def test_frontend_refreshes_atm_strike_from_live_ltp(self):
+        html = Path("web/backend/static/index.html").read_text(encoding="utf-8")
+        self.assertIn("function expectedAtmStrike(ltp, symbolHint, optionType, offset)", html)
+        self.assertIn("function refreshAtmStrikeFromLtp(ltp, positionOpen)", html)
+        self.assertIn("tradeSymbolEl.value = updateSymbolStrike(cur, expected)", html)
+        self.assertIn("refreshAtmStrikeFromLtp(liveLtp, positionOpen)", html)
+        self.assertIn("if (tradeSymbolEl && tradeSymbolEl.matches(':focus')) return;", html)
+        self.assertIn("if (positionOpen) return;", html)
+
+        render_match = re.search(r"function render\(payload\) \{(.*?)\n    \}", html, re.DOTALL)
+        self.assertIsNotNone(render_match, "render() not found in index.html")
+        render_body = render_match.group(1)
+        self.assertIn("refreshAtmStrikeFromLtp(liveLtp, positionOpen)", render_body)
+        self.assertNotIn("suggestSymbol()", render_body)
+
+        trade_match = re.search(
+            r"async function executeTrade\(action\) \{(.*?)\n    \}",
+            html,
+            re.DOTALL,
+        )
+        self.assertIsNotNone(trade_match, "executeTrade() not found in index.html")
+        self.assertNotIn("refreshAtmStrikeFromLtp", trade_match.group(1))
+
 
 if __name__ == "__main__":
     unittest.main()

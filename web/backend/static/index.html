@@ -962,6 +962,31 @@
       tradeSymbolEl.value = updateSymbolStrike(cur, nextStrike);
     }
 
+    function expectedAtmStrike(ltp, symbolHint, optionType, offset) {
+      const step = detectStrikeStep(symbolHint);
+      const atm = Math.round(Number(ltp) / step) * step;
+      const off = Number(offset) || 0;
+      if (String(optionType || '').toUpperCase() === 'PE') {
+        return atm - off * step;
+      }
+      return atm + off * step;
+    }
+
+    function refreshAtmStrikeFromLtp(ltp, positionOpen) {
+      if (!Number.isFinite(ltp) || ltp <= 0) return;
+      if (tradeInFlight) return;
+      if (positionOpen) return;
+      if (tradeSymbolEl && tradeSymbolEl.matches(':focus')) return;
+      const cur = String(tradeSymbolEl?.value || '').trim();
+      const parts = parseSymbolParts(cur);
+      if (!parts) return;
+      const optionType = document.getElementById('optionType')?.value || parts.opt;
+      const offset = Number(strikeOffsetEl?.value || '0');
+      const expected = expectedAtmStrike(ltp, cur, optionType, offset);
+      if (!Number.isFinite(expected) || expected <= 0 || parts.strike === expected) return;
+      tradeSymbolEl.value = updateSymbolStrike(cur, expected);
+    }
+
     function strategyFromIndicator(indicator) {
       if (!indicator) return { text: 'Strategy: —', color: '#6b7280' };
       const sig = indicator.signal || '';
@@ -1194,12 +1219,18 @@
       renderRisk(risk, systemTradingEnabled);
 
       const posEl = document.getElementById('positionLabel');
-      if (position && position.symbol) {
+      const positionOpen = !!(position && position.symbol);
+      if (positionOpen) {
         posEl.textContent = `● POSITION OPEN — ${position.symbol} (${position.qty}) @ ${position.entry_price ?? '—'}`;
         posEl.className = 'open';
       } else {
         posEl.textContent = '● NO POSITION';
         posEl.className = 'flat';
+      }
+
+      const liveLtp = Number(indicator.index_ltp);
+      if (Number.isFinite(liveLtp) && liveLtp > 0) {
+        refreshAtmStrikeFromLtp(liveLtp, positionOpen);
       }
 
       const strat = strategyFromIndicator(indicator);
