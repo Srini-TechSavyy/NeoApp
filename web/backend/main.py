@@ -116,6 +116,11 @@ async def trade_action_latency_middleware(request: Request, call_next):
     return response
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse(os.path.join(STATIC_DIR, "favicon.ico"))
+
+
 @app.get("/")
 def index():
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
