@@ -42,42 +42,119 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      padding: 8px 16px;
+      gap: 10px;
+      padding: 6px 12px;
       background: var(--panel);
       border-bottom: 1px solid var(--border);
-      box-shadow: 0 1px 0 rgba(255,255,255,0.8);
+    }
+    .top-bar-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
     }
     .top-bar h1 {
       margin: 0;
-      font-size: 14px;
-      font-weight: 750;
-      letter-spacing: 0.04em;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.05em;
       color: var(--navy);
+      white-space: nowrap;
     }
-    .top-meta {
+    .top-bar-right {
       display: flex;
-      flex-wrap: wrap;
       align-items: center;
-      justify-content: flex-end;
-      gap: 8px 14px;
-      font-size: 12px;
-      font-weight: 600;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .live-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 22px;
+      padding: 0 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid var(--border);
+      background: #f8fafc;
       color: var(--muted);
     }
+    .live-pill::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #94a3b8;
+    }
+    .live-pill.connected {
+      color: #166534;
+      background: #ecfdf3;
+      border-color: #86efac;
+    }
+    .live-pill.connected::before { background: var(--buy); }
+    .live-pill.disconnected { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+    .live-pill.disconnected::before { background: var(--exit); }
+    .btn-icon {
+      width: 30px;
+      min-width: 30px;
+      padding: 0;
+      font-size: 15px;
+      line-height: 1;
+      background: transparent;
+      border-color: transparent;
+      color: var(--muted);
+    }
+    .btn-icon:hover:not(:disabled) { background: #f1f5f9; border-color: var(--border); color: var(--navy); }
+
+    .pnl-summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0;
+      margin: 8px 0 6px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .pnl-cell {
+      padding: 6px 10px;
+      border-right: 1px solid var(--border);
+      min-width: 0;
+    }
+    .pnl-cell:last-child { border-right: none; }
+    .pnl-lbl {
+      display: block;
+      font-size: 10px;
+      font-weight: 650;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .pnl-val {
+      display: block;
+      font-size: 14px;
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+      color: var(--navy);
+      line-height: 1.2;
+    }
     #topActualPnl,
-    #topNetPnl { font-variant-numeric: tabular-nums; }
+    #topNetPnl { font: inherit; display: inline; }
     #topActualPnl.positive,
     #topNetPnl.positive { color: var(--buy); }
     #topActualPnl.negative,
     #topNetPnl.negative { color: var(--exit); }
-    #topBrokerage { font-variant-numeric: tabular-nums; color: var(--muted); }
-    #connStatus.disconnected { color: var(--exit); }
-    #connStatus.connected { color: var(--buy); }
+    #topBrokerage { font: inherit; color: var(--navy); }
+    #topIndexLtp { font: inherit; }
 
     .main-container {
-      padding: 8px 10px;
-      max-width: 720px;
+      padding: 0 10px 10px;
+      max-width: 640px;
       margin: 0 auto;
     }
 
@@ -86,7 +163,7 @@
       border: 1px solid var(--border);
       border-radius: 6px;
       box-shadow: var(--shadow);
-      padding: 10px 12px 8px;
+      padding: 8px 10px 8px;
       min-width: 0;
     }
 
@@ -97,54 +174,27 @@
     .form-grid {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
       align-items: stretch;
       min-width: 0;
     }
-    .trade-strip {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      min-width: 0;
-    }
-    .strip-controls-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-end;
-      justify-content: flex-start;
+    .option-grid {
+      display: grid;
+      grid-template-columns: minmax(72px, 0.85fr) minmax(88px, 1fr) minmax(0, 1.35fr);
       gap: 6px 8px;
-      width: 100%;
+      align-items: end;
       min-width: 0;
     }
-    .strip-controls-row .strip-strike {
-      flex: 1 1 100%;
-      min-width: 0;
-    }
-    .strip-controls-row .strip-option,
-    .strip-controls-row .strip-suggest {
-      flex: 0 0 auto;
+    .option-grid-row2 {
+      grid-template-columns: minmax(88px, auto) minmax(0, 1fr) auto;
+      margin-top: 2px;
     }
     .strip-cell {
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
+      align-items: stretch;
       gap: 3px;
       min-width: 0;
-    }
-    .strip-symbol-lots {
-      display: flex;
-      flex-wrap: nowrap;
-      align-items: flex-end;
-      gap: 8px;
-      width: 100%;
-      min-width: 0;
-    }
-    .strip-symbol-lots .strip-symbol {
-      flex: 1 1 auto;
-      min-width: 0;
-    }
-    .strip-symbol-lots .strip-lots {
-      flex: 0 0 auto;
     }
     .strip-lbl {
       font-size: 11px;
@@ -187,9 +237,16 @@
       border-color: #166534;
       color: #fff;
       font-weight: 750;
-      letter-spacing: 0.06em;
-      min-width: 96px;
-      height: 32px;
+      letter-spacing: 0.04em;
+      flex: 1;
+      min-width: 0;
+      height: 42px;
+      font-size: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 6px;
     }
     .btn-buy:hover:not(:disabled) { background: #166534; }
     .btn-exit {
@@ -197,52 +254,200 @@
       border-color: #b91c1c;
       color: #fff;
       font-weight: 750;
-      letter-spacing: 0.06em;
-      min-width: 96px;
-      height: 32px;
-    }
-    .btn-exit:hover:not(:disabled) { background: #b91c1c; }
-    .btn-ce {
-      background: #ecfdf3;
-      color: #166534;
-      border-color: #86efac;
-      min-width: 76px;
-      font-weight: 700;
-    }
-    .btn-pe {
-      background: #fef2f2;
-      color: #991b1b;
-      border-color: #fca5a5;
-      min-width: 76px;
-      font-weight: 700;
-    }
-    .badge-auto {
+      letter-spacing: 0.04em;
+      flex: 1;
+      min-width: 0;
+      height: 42px;
+      font-size: 14px;
       display: inline-flex;
       align-items: center;
-      height: 26px;
-      padding: 0 8px;
-      border-radius: 999px;
-      background: var(--amber-bg);
-      border: 1px solid var(--amber-border);
-      font-size: 11px;
-      font-weight: 700;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 6px;
+    }
+    .btn-exit:hover:not(:disabled) { background: #b91c1c; }
+    .btn-action-icon { font-size: 11px; opacity: 0.95; }
+    .kbd-hint {
+      margin-left: auto;
+      font-size: 10px;
+      font-weight: 600;
+      opacity: 0.55;
       letter-spacing: 0.02em;
-      color: var(--amber);
     }
-    .badge-auto.on {
+    .type-segment {
+      display: inline-flex;
+      width: 100%;
+      max-width: 108px;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .type-seg {
+      flex: 1;
+      min-width: 0;
+      height: var(--control-h);
+      border: none;
+      border-radius: 0;
+      background: #fff;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 12px;
+      padding: 0 6px;
+    }
+    .type-seg + .type-seg { border-left: 1px solid var(--border); }
+    .type-seg.active.pe {
+      background: #fef2f2;
+      color: #991b1b;
+      box-shadow: inset 0 0 0 1px #fca5a5;
+    }
+    .type-seg.active.ce {
       background: #ecfdf3;
-      border-color: #86efac;
       color: #166534;
+      box-shadow: inset 0 0 0 1px #86efac;
     }
-
-    #tradeLots { width: 56px; background: #fff; max-width: 100%; }
+    .type-seg:focus-visible { box-shadow: inset 0 0 0 2px var(--accent-soft); }
 
     .controls-row {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       gap: 6px;
+      margin: 0;
+    }
+    .action-btns {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+    }
+    .auto-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      width: 100%;
+    }
+    .auto-card {
+      display: flex;
       align-items: center;
-      margin: 2px 0 0;
+      gap: 8px;
+      min-height: 34px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--amber-border);
+      background: var(--amber-bg);
+      font-size: 11px;
+      font-weight: 650;
+      color: var(--amber);
+    }
+    .auto-card.on {
+      background: #fff7ed;
+      border-color: #fdba74;
+    }
+    .auto-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid #cbd5e1;
+      background: #fff;
+      flex-shrink: 0;
+    }
+    .auto-card.on .auto-dot {
+      border-color: #86efac;
+      background: #ecfdf3;
+      box-shadow: inset 0 0 0 3px #fff;
+    }
+    .auto-name { flex: 1; min-width: 0; }
+    .auto-state {
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      font-size: 10px;
+    }
+    .auto-card.on .auto-state { color: #166534; }
+
+    .symbol-field-wrap {
+      display: flex;
+      align-items: stretch;
+      width: 100%;
+      min-width: 0;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      background: #fff;
+      overflow: hidden;
+    }
+    .symbol-field-wrap:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .symbol-field-wrap #tradeSymbol {
+      flex: 1;
+      min-width: 0;
+      border: none;
+      border-radius: 0;
+      height: var(--control-h);
+      box-shadow: none;
+    }
+    .symbol-field-wrap #tradeSymbol:focus { box-shadow: none; }
+    #suggestBtn {
+      width: 34px;
+      min-width: 34px;
+      padding: 0;
+      border: none;
+      border-left: 1px solid var(--border);
+      border-radius: 0;
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    #suggestBtn:hover:not(:disabled) { background: #eef2f7; color: var(--navy); }
+
+    .lots-stepper {
+      display: inline-flex;
+      align-items: stretch;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .lots-stepper .btn-sm {
+      width: 30px;
+      min-width: 30px;
+      border: none;
+      border-radius: 0;
+      background: #f8fafc;
+    }
+    .lots-stepper .btn-sm + .btn-sm { border-left: 1px solid var(--border); }
+    #lotsDec { border-right: 1px solid var(--border); }
+    #tradeLots {
+      width: 36px;
+      min-width: 36px;
+      border: none;
+      border-radius: 0;
+      text-align: center;
+      padding: 0 4px;
+      height: var(--control-h);
+      -moz-appearance: textfield;
+    }
+    #tradeLots::-webkit-outer-spin-button,
+    #tradeLots::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+    .strike-inline {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+    }
+    .strike-inline .btn-sm { flex-shrink: 0; }
+    #strikeOffset { flex: 1; min-width: 0; max-width: none; width: auto; }
+
+    #indexLtpLive.sr-only-live {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
 
     .status-bar {
@@ -330,410 +535,182 @@
       padding: 1px 5px;
       border-radius: 4px;
     }
-    .strike-row .offset-label { font-size: 11px; margin-left: 6px; }
-    #strikeOffset { width: 88px; }
-    #baseSymbol { width: 88px; min-width: 0; }
-    #suggestBtn { margin-left: 0; }
-    #tradeSymbol { min-width: 0; width: 100%; flex: 1; }
+    #baseSymbol { width: 100%; min-width: 0; }
+    #expirySelect { width: 100%; min-width: 0; color: var(--text); }
     #token { min-width: 220px; }
     #indexLtpManual { width: 180px; }
     .ltp-hint { font-size: 11px; }
     .connect-endpoints { font-size: 11px; margin-top: 6px; }
     #suggestedSymbol { font-size: 11px; margin-top: 4px; }
-    .action-btns { display: flex; gap: 8px; align-items: center; flex: 0 0 auto; }
-    .auto-badges { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-    .controls-row .action-btns,
-    .controls-row .auto-badges { min-width: 0; }
-
-    #topIndexLtp { font-variant-numeric: tabular-nums; }
     #topClock {
       font-variant-numeric: tabular-nums;
-      font-size: 11px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
     }
 
     @media (min-width: 768px) {
-      .main-container { padding: 8px 14px; }
+      .main-container { padding: 0 14px 12px; max-width: 680px; }
     }
 
-    @media (min-width: 1024px) {
-      .main-container { max-width: 960px; }
-      .trade-strip {
-        display: flex;
-        flex-direction: row;
-        flex-wrap: wrap;
-        align-items: flex-end;
-        gap: 8px 10px;
+    @media (max-width: 640px) {
+      .pnl-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
-      .strip-controls-row { display: contents; }
-      .strip-strike { flex: 0 1 auto; min-width: 0; }
-      .strip-option { flex: 0 0 auto; }
-      .strip-suggest { flex: 0 0 auto; }
-      .strip-symbol-lots { flex: 1 1 280px; min-width: 220px; }
-      .strip-symbol { flex: 1 1 auto; min-width: 0; }
-      .controls-row {
-        flex-wrap: nowrap;
-        justify-content: space-between;
-      }
-      .action-btns { flex: 0 0 auto; }
-      .auto-badges { flex: 1 1 auto; justify-content: flex-end; }
-      #indexLtpLive.header-ltp { display: none; }
-    }
-
-    @media (min-width: 1440px) {
-      .main-container { max-width: 1040px; }
+      .pnl-cell:nth-child(2) { border-right: none; }
+      .pnl-cell:nth-child(1),
+      .pnl-cell:nth-child(2) { border-bottom: 1px solid var(--border); }
     }
 
     @media (max-width: 600px) {
-      body {
-        font-size: 13px;
-        overflow-x: hidden;
+      body { overflow-x: hidden; }
+      .top-bar { padding: 6px 10px; }
+      .main-container { max-width: 100%; padding: 0 10px 12px; }
+      .pnl-summary { margin-top: 6px; }
+      .option-grid {
+        grid-template-columns: 1fr;
+        gap: 6px;
       }
-      .top-bar {
-        flex-direction: column;
-        align-items: stretch;
-        padding: 8px 14px;
-        gap: 4px;
+      .option-grid-row2 {
+        grid-template-columns: 1fr;
       }
-      .top-bar h1 {
-        font-size: 13px;
-        line-height: 1.3;
-        max-width: 100%;
-      }
-      .top-meta {
-        width: 100%;
+      .strip-cell-strip-mobile { width: 100%; }
+      .option-grid .strip-strike-cell {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-areas:
-          "actual net"
-          "brok conn"
-          "ltp time";
-        gap: 2px 8px;
-        font-size: 11px;
-        min-width: 0;
-      }
-      #topActualWrap { grid-area: actual; }
-      #topNetWrap { grid-area: net; justify-self: end; }
-      #topBrokerageWrap {
-        grid-area: brok;
-        text-align: left;
-      }
-      #connStatus { grid-area: conn; justify-self: end; }
-      #topIndexLtp { grid-area: ltp; }
-      #topClock { grid-area: time; justify-self: end; }
-      .top-meta > span {
-        min-width: 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .main-container {
-        max-width: 100%;
-        padding: 8px 14px 12px;
-      }
-      .scalper-panel {
-        width: 100%;
-        max-width: 100%;
-        padding: 10px 12px 8px;
-        overflow-x: clip;
-      }
-
-      .row-inline {
-        min-width: 0;
-        max-width: 100%;
-      }
-
-      .strike-row {
-        display: grid;
-        grid-template-columns: 32px 32px minmax(0, 1fr);
-        grid-template-areas:
-          "up down offsetSelect"
-          "offsetLabel offsetLabel offsetLabel"
-          "ltp ltp ltp";
-        align-items: center;
         gap: 6px;
-        width: 100%;
-        min-width: 0;
+        align-items: end;
       }
-      .strike-row .btn-sm {
-        width: 32px;
-        min-width: 32px;
-        height: 30px;
-        padding: 0;
+      .option-grid .strip-strike-cell .strip-cell:nth-child(1) { grid-column: 1; }
+      .option-grid .strip-strike-cell .strip-cell:nth-child(2) { grid-column: 2; }
+      .option-grid .strip-strike-cell .strip-cell:nth-child(3) {
+        grid-column: 1 / -1;
       }
-      #strikeUp { grid-area: up; }
-      #strikeDown { grid-area: down; }
-      .strike-row .offset-label {
-        margin-left: 0;
-        grid-area: offsetLabel;
-        white-space: nowrap;
-      }
-      #strikeOffset {
-        grid-area: offsetSelect;
-        width: 100%;
-        min-width: 0;
-        max-width: none;
-      }
-      #suggestBtn {
-        margin-left: 0;
-        width: 100%;
-      }
-      #indexLtpLive {
-        grid-area: ltp;
-        width: 100%;
-        overflow-wrap: anywhere;
-        word-break: break-word;
-      }
-
-      .strip-controls-row {
-        display: flex;
-        flex-wrap: wrap;
-        justify-content: flex-start;
-        align-items: flex-end;
-        gap: 6px 8px;
-      }
-      .strip-controls-row .strip-strike {
-        flex: 1 1 100%;
-        width: 100%;
-        min-width: 0;
-      }
-      .strip-controls-row .strike-row {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 6px;
-        width: 100%;
-        min-width: 0;
-      }
-      .strip-controls-row .strike-row .btn-sm {
-        width: auto;
-        min-width: 30px;
-      }
-      .strip-controls-row #strikeOffset {
-        width: 88px;
-        max-width: 100%;
-        flex: 1 1 72px;
-        min-width: 0;
-      }
-      .strip-controls-row #suggestBtn {
-        margin-left: 0;
-        width: auto;
-      }
-      .strip-controls-row #indexLtpLive {
-        width: auto;
-        flex: 1 1 100%;
-      }
-
-      .option-row #cePeBtn,
-      #cePeBtn {
-        width: auto;
-        min-width: 76px;
-      }
-
-      #tradeLots {
-        width: 56px;
-        min-width: 0;
-        max-width: 100%;
-      }
-
-      .symbol-row {
-        display: block;
-        width: 100%;
-      }
-      #tradeSymbol {
-        min-width: 0;
-        width: 100%;
-        max-width: 100%;
-      }
-
-      .controls-row {
-        margin: 2px 0 0;
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 6px;
-        width: 100%;
-        min-width: 0;
-        max-width: 100%;
-      }
-      .action-btns {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        width: 100%;
-        gap: 8px;
-      }
-      .btn-buy,
-      .btn-exit {
-        width: 100%;
-        min-width: 0;
-        max-width: 100%;
-      }
-      .auto-badges {
-        width: 100%;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        gap: 6px;
-      }
-      .badge-auto {
-        justify-content: center;
-        min-width: 0;
-        width: 100%;
-        height: auto;
-        min-height: 28px;
-        padding: 4px 6px;
-        text-align: center;
-        overflow-wrap: anywhere;
-        font-size: 10px;
-      }
-
+      .type-segment { max-width: none; }
+      .action-btns { flex-direction: column; }
+      .btn-buy, .btn-exit { width: 100%; height: 44px; }
+      .auto-row { grid-template-columns: 1fr; }
       .status-bar {
-        padding: 8px 10px;
-        gap: 6px;
+        flex-direction: column;
         align-items: flex-start;
-        flex-direction: column;
+        gap: 4px;
       }
-      #buyStatusLabel,
-      #positionLabel,
-      #strategyLabel,
-      #momentumAlert {
-        min-width: 0;
-        max-width: 100%;
-        overflow-wrap: anywhere;
-        word-break: break-word;
-      }
-      #strategyLabel {
-        margin-left: 0;
-        text-align: left;
-        width: 100%;
-      }
-
-      #lastActionLine,
-      #tradeResponse {
-        overflow-wrap: anywhere;
-        word-break: break-word;
-      }
-
-      .web-connect {
-        width: 100%;
-        margin-top: 8px;
-        padding: 8px 10px;
-      }
-      .web-connect summary {
-        overflow-wrap: anywhere;
-      }
-      .web-connect .row {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 6px;
-        margin-top: 8px;
-      }
+      #strategyLabel { margin-left: 0; text-align: left; width: 100%; }
       .web-connect input,
       #token,
-      #indexLtpManual {
-        width: 100%;
-        min-width: 0;
-        max-width: 100%;
-      }
-      .ltp-hint,
-      .connect-endpoints,
-      #message,
-      #suggestedSymbol {
-        overflow-wrap: anywhere;
-        word-break: break-word;
-        max-width: 100%;
-      }
-      .connect-endpoints { margin-top: 4px; }
-      .connect-endpoints code {
-        display: inline-block;
-        max-width: 100%;
-        overflow-wrap: anywhere;
-        word-break: break-word;
-      }
-      input, select, button {
-        max-width: 100%;
-      }
+      #indexLtpManual { width: 100%; min-width: 0; max-width: 100%; }
     }
 
     @media (max-width: 360px) {
-      .badge-auto {
-        font-size: 10px;
-        padding: 4px 5px;
-      }
+      .pnl-val { font-size: 13px; }
+      .auto-card { padding: 5px 8px; font-size: 10px; }
     }
   </style>
 </head>
 <body>
   <header class="top-bar">
-    <h1>SCALPER PRO</h1>
-    <div class="top-meta">
-      <span id="topActualWrap">Actual PnL: <span id="topActualPnl">—</span></span>
-      <span id="topNetWrap">Net PnL: <span id="topNetPnl">—</span></span>
-      <span id="topBrokerageWrap">Brokerage: <span id="topBrokerage">—</span></span>
-      <span id="topIndexLtp" class="muted">LTP: —</span>
-      <span id="topClock" class="muted" aria-hidden="true"></span>
-      <span id="connStatus" class="disconnected">Offline</span>
+    <div class="top-bar-left">
+      <h1>SCALPER PRO</h1>
+      <span id="connStatus" class="live-pill disconnected">Offline</span>
+    </div>
+    <div class="top-bar-right">
+      <span id="topClock" class="top-clock" aria-label="Current time"></span>
+      <button type="button" id="settingsBtn" class="btn-icon" title="Connection settings" aria-label="Settings">⚙</button>
     </div>
   </header>
 
   <div class="main-container">
+    <div class="pnl-summary" aria-label="Market summary">
+      <div class="pnl-cell">
+        <span class="pnl-lbl" id="summaryLtpLabel">Index LTP</span>
+        <span class="pnl-val" id="topIndexLtp">—</span>
+      </div>
+      <div class="pnl-cell">
+        <span class="pnl-lbl">Actual PnL</span>
+        <span class="pnl-val" id="topActualPnl">—</span>
+      </div>
+      <div class="pnl-cell">
+        <span class="pnl-lbl">Net PnL</span>
+        <span class="pnl-val" id="topNetPnl">—</span>
+      </div>
+      <div class="pnl-cell">
+        <span class="pnl-lbl">Brokerage</span>
+        <span class="pnl-val" id="topBrokerage">—</span>
+      </div>
+    </div>
+
     <section class="scalper-panel">
       <div class="form-grid">
-        <div class="trade-strip">
-          <div class="strip-controls-row">
-            <div class="strip-cell strip-index">
-              <span class="strip-lbl">Index</span>
-              <select id="baseSymbol" aria-label="Index">
-                <option value="NIFTY">NIFTY</option>
-                <option value="SENSEX">SENSEX</option>
+        <div class="option-grid option-grid-row1">
+          <div class="strip-cell">
+            <span class="strip-lbl">Index</span>
+            <select id="baseSymbol" aria-label="Index">
+              <option value="NIFTY">NIFTY</option>
+              <option value="SENSEX">SENSEX</option>
+            </select>
+          </div>
+          <div class="strip-cell">
+            <span class="strip-lbl">Expiry</span>
+            <select id="expirySelect" aria-label="Expiry" disabled title="Synced from symbol; use Suggest to update">
+              <option value="">—</option>
+            </select>
+          </div>
+          <div class="strip-cell">
+            <span class="strip-lbl">Strike</span>
+            <div class="strike-inline">
+              <button type="button" class="btn-sm" id="strikeUp" title="Bump strike">▲</button>
+              <button type="button" class="btn-sm" id="strikeDown" title="Lower strike">▼</button>
+              <select id="strikeOffset" aria-label="Strike offset">
+                <option value="0">ATM</option>
               </select>
             </div>
-            <div class="strip-cell strip-strike">
-              <span class="strip-lbl">Strike</span>
-              <div class="row-inline strike-row">
-                <button type="button" class="btn-sm" id="strikeUp" title="Bump strike">▲</button>
-                <button type="button" class="btn-sm" id="strikeDown" title="Lower strike">▼</button>
-                <label class="muted offset-label">Offset</label>
-                <select id="strikeOffset">
-                  <option value="0">ATM</option>
-                </select>
-                <span id="indexLtpLive" class="muted na-tag header-ltp"></span>
-              </div>
-            </div>
-            <div class="strip-cell strip-option">
-              <span class="strip-lbl">Type</span>
-              <div class="option-row">
-                <button type="button" id="cePeBtn" class="btn-ce">CE</button>
-              </div>
-            </div>
-            <div class="strip-cell strip-suggest">
-              <span class="strip-lbl strip-lbl-spacer" aria-hidden="true">&nbsp;</span>
-              <button type="button" id="suggestBtn">Suggest</button>
+            <span id="indexLtpLive" class="sr-only-live muted na-tag" aria-live="polite"></span>
+          </div>
+        </div>
+
+        <div class="option-grid option-grid-row2">
+          <div class="strip-cell">
+            <span class="strip-lbl">Type</span>
+            <div class="type-segment" role="group" aria-label="Option type">
+              <button type="button" id="peTypeBtn" class="type-seg">PE</button>
+              <button type="button" id="ceTypeBtn" class="type-seg active ce">CE</button>
             </div>
           </div>
-          <div class="strip-symbol-lots">
-            <div class="strip-cell strip-symbol">
-              <span class="strip-lbl">Symbol</span>
-              <div class="row-inline symbol-row">
-                <input id="tradeSymbol" type="text" placeholder="NIFTY26AUG25000CE" />
-                <input id="indexLtp" type="hidden" />
-                <input id="optionType" type="hidden" value="CE" />
-              </div>
+          <div class="strip-cell">
+            <span class="strip-lbl">Symbol</span>
+            <div class="symbol-field-wrap">
+              <input id="tradeSymbol" type="text" placeholder="NIFTY26AUG25000CE" autocomplete="off" spellcheck="false" />
+              <input id="indexLtp" type="hidden" />
+              <input id="optionType" type="hidden" value="CE" />
+              <button type="button" id="suggestBtn" title="Suggest symbol" aria-label="Suggest symbol">🔍</button>
             </div>
-            <div class="strip-cell strip-lots">
-              <span class="strip-lbl">Lots</span>
+          </div>
+          <div class="strip-cell">
+            <span class="strip-lbl">Lots</span>
+            <div class="lots-stepper">
+              <button type="button" class="btn-sm" id="lotsDec" title="Decrease lots" aria-label="Decrease lots">−</button>
               <input id="tradeLots" type="number" min="1" step="1" value="1" aria-label="Lots" />
+              <button type="button" class="btn-sm" id="lotsInc" title="Increase lots" aria-label="Increase lots">+</button>
             </div>
           </div>
         </div>
 
         <div class="controls-row">
           <div class="action-btns">
-            <button type="button" id="buyBtn" class="btn-buy">BUY</button>
-            <button type="button" id="exitBtn" class="btn-exit">EXIT</button>
+            <button type="button" id="buyBtn" class="btn-buy"><span class="btn-action-icon" aria-hidden="true">▲</span> BUY</button>
+            <button type="button" id="exitBtn" class="btn-exit"><span class="btn-action-icon" aria-hidden="true">▼</span> EXIT</button>
           </div>
-          <div class="auto-badges">
-            <span id="autoBuyBadge" class="badge-auto">AUTO BUY: —</span>
-            <span id="autoSellBadge" class="badge-auto">AUTO SELL: —</span>
+          <div class="auto-row">
+            <div id="autoBuyBadge" class="auto-card" aria-live="polite">
+              <span class="auto-dot" aria-hidden="true"></span>
+              <span class="auto-name">Auto Buy</span>
+              <span class="auto-state">—</span>
+            </div>
+            <div id="autoSellBadge" class="auto-card" aria-live="polite">
+              <span class="auto-dot" aria-hidden="true"></span>
+              <span class="auto-name">Auto Sell</span>
+              <span class="auto-state">—</span>
+            </div>
           </div>
         </div>
 
@@ -748,7 +725,7 @@
         <div id="tradeResponse"></div>
       </div>
 
-      <details class="web-connect" open>
+      <details class="web-connect">
         <summary>Web connection (snapshot &amp; orders)</summary>
         <div class="row">
           <label for="token">API Token</label>
@@ -791,13 +768,80 @@
     const buyBtn = document.getElementById('buyBtn');
     const exitBtn = document.getElementById('exitBtn');
     const suggestBtn = document.getElementById('suggestBtn');
-    const cePeBtn = document.getElementById('cePeBtn');
+    const peTypeBtn = document.getElementById('peTypeBtn');
+    const ceTypeBtn = document.getElementById('ceTypeBtn');
     const lastActionLine = document.getElementById('lastActionLine');
     const monText = document.getElementById('monText');
     const strikeOffsetEl = document.getElementById('strikeOffset');
     const baseSymbolEl = document.getElementById('baseSymbol');
     const BASE_INDEX_STORAGE_KEY = 'neo_web_base_index';
     let indexLtpFetchGen = 0;
+
+    function updateSummaryLtpLabel(name) {
+      const el = document.getElementById('summaryLtpLabel');
+      if (!el) return;
+      const base = String(name || getSelectedBaseIndex()).trim().toUpperCase();
+      el.textContent = `${base} LTP`;
+    }
+
+    function formatLtpValue(ltp) {
+      const n = Number(ltp);
+      if (!Number.isFinite(n)) return '—';
+      return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function setTopIndexLtp(displayName, ltp) {
+      updateSummaryLtpLabel(displayName || getSelectedBaseIndex());
+      const topLtp = document.getElementById('topIndexLtp');
+      if (!topLtp) return;
+      if (ltp === null || ltp === undefined || ltp === '') {
+        topLtp.textContent = '—';
+        return;
+      }
+      topLtp.textContent = formatLtpValue(ltp);
+    }
+
+    function formatExpiryDisplay(expiryToken) {
+      const e = String(expiryToken || '').trim().toUpperCase();
+      if (!e) return '—';
+      if (/^[0-9]{6}$/.test(e)) {
+        const yy = e.slice(0, 2);
+        const mm = parseInt(e.slice(2, 4), 10);
+        const dd = e.slice(4, 6);
+        const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+        const mon = months[mm - 1] || String(mm);
+        return `${dd} ${mon} 20${yy}`;
+      }
+      if (/^[0-9]{2}[A-Z]{3}$/.test(e)) {
+        return `${e.slice(2)} 20${e.slice(0, 2)}`;
+      }
+      return e;
+    }
+
+    function syncExpiryFromSymbol() {
+      const sel = document.getElementById('expirySelect');
+      if (!sel) return;
+      const parts = parseSymbolParts(tradeSymbolEl?.value || '');
+      sel.innerHTML = '';
+      const opt = document.createElement('option');
+      if (!parts || !parts.expiry) {
+        opt.value = '';
+        opt.textContent = '—';
+      } else {
+        opt.value = parts.expiry;
+        opt.textContent = formatExpiryDisplay(parts.expiry);
+      }
+      sel.appendChild(opt);
+    }
+
+    function clampLots(n) {
+      return Math.max(1, Math.floor(Number(n) || 1));
+    }
+
+    function bumpLots(delta) {
+      if (!tradeLotsEl) return;
+      tradeLotsEl.value = String(clampLots(Number(tradeLotsEl.value || 1) + delta));
+    }
 
     function getSelectedBaseIndex() {
       const raw = baseSymbolEl?.value || 'NIFTY';
@@ -877,11 +921,10 @@
         }
         applyIndexLtpFields(j.index_ltp);
         const idxLive = document.getElementById('indexLtpLive');
-        const topLtp = document.getElementById('topIndexLtp');
-        const name = j.index_name ? `${j.index_name} ` : `${base_symbol} `;
-        const ltpText = `${name}LTP ${Number(j.index_ltp).toFixed(2)}`;
+        const name = j.index_name ? j.index_name.trim() : base_symbol;
+        const ltpText = `${name} LTP ${Number(j.index_ltp).toFixed(2)}`;
         if (idxLive) idxLive.textContent = `${ltpText} (broker)`;
-        if (topLtp) topLtp.textContent = ltpText;
+        setTopIndexLtp(name, j.index_ltp);
         if (suggestAfter) await suggestSymbol({ skipLtpFetch: true });
         return true;
       } catch (e) {
@@ -958,8 +1001,9 @@
 
     function setConnStatus(connected) {
       const el = document.getElementById('connStatus');
+      if (!el) return;
       el.textContent = connected ? 'Live' : 'Offline';
-      el.className = connected ? 'connected' : 'disconnected';
+      el.className = connected ? 'live-pill connected' : 'live-pill disconnected';
     }
 
     function setMessage(msg, cls = 'muted') {
@@ -1031,11 +1075,32 @@
       return 'NIFTY';
     }
 
-    function syncCePeButton() {
-      if (!cePeBtn) return;
-      const opt = document.getElementById('optionType').value;
-      cePeBtn.textContent = opt;
-      cePeBtn.className = opt === 'PE' ? 'btn-pe' : 'btn-ce';
+    function syncOptionTypeButtons() {
+      const opt = document.getElementById('optionType')?.value || 'CE';
+      if (peTypeBtn) {
+        peTypeBtn.classList.toggle('active', opt === 'PE');
+        peTypeBtn.classList.toggle('pe', opt === 'PE');
+      }
+      if (ceTypeBtn) {
+        ceTypeBtn.classList.toggle('active', opt === 'CE');
+        ceTypeBtn.classList.toggle('ce', opt === 'CE');
+      }
+    }
+
+    async function setOptionType(next, opts = {}) {
+      const optEl = document.getElementById('optionType');
+      if (!optEl) return;
+      const normalized = next === 'PE' ? 'PE' : 'CE';
+      if (optEl.value === normalized) {
+        syncOptionTypeButtons();
+        return;
+      }
+      optEl.value = normalized;
+      syncOptionTypeButtons();
+      const cur = tradeSymbolEl.value.trim();
+      if (cur) tradeSymbolEl.value = updateSymbolOption(cur, normalized);
+      syncExpiryFromSymbol();
+      if (opts.suggest !== false && getIndexLtpValue() > 0) await suggestSymbol();
     }
 
     function bindClick(el, handler) {
@@ -1057,6 +1122,7 @@
       const nextStrike = parts.strike + delta * step;
       if (nextStrike <= 0) return;
       tradeSymbolEl.value = updateSymbolStrike(cur, nextStrike);
+      syncExpiryFromSymbol();
     }
 
     function expectedAtmStrike(ltp, symbolHint, optionType, offset) {
@@ -1082,6 +1148,7 @@
       const expected = expectedAtmStrike(ltp, cur || getSelectedBaseIndex(), optionType, offset);
       if (!Number.isFinite(expected) || expected <= 0 || parts.strike === expected) return;
       tradeSymbolEl.value = updateSymbolStrike(cur, expected);
+      syncExpiryFromSymbol();
     }
 
     function strategyFromIndicator(indicator) {
@@ -1182,21 +1249,24 @@
     function renderAutomation(auto) {
       const ab = document.getElementById('autoBuyBadge');
       const as = document.getElementById('autoSellBadge');
+      if (!ab || !as) return;
+
+      const apply = (el, label, on) => {
+        el.classList.toggle('on', on === true);
+        const stateEl = el.querySelector('.auto-state');
+        const nameEl = el.querySelector('.auto-name');
+        if (nameEl) nameEl.textContent = label;
+        if (stateEl) stateEl.textContent = on === null || on === undefined ? '—' : (on ? 'ON' : 'OFF');
+      };
 
       if (!auto || typeof auto !== 'object') {
-        ab.textContent = 'AUTO BUY: —';
-        as.textContent = 'AUTO SELL: —';
-        ab.classList.remove('on');
-        as.classList.remove('on');
+        apply(ab, 'Auto Buy', null);
+        apply(as, 'Auto Sell', null);
         return;
       }
 
-      const buyOn = !!auto.auto_buy_enabled;
-      const sellOn = !!auto.auto_sell_enabled;
-      ab.textContent = `AUTO BUY: ${buyOn ? 'ON' : 'OFF'}`;
-      as.textContent = `AUTO SELL: ${sellOn ? 'ON' : 'OFF'}`;
-      ab.classList.toggle('on', buyOn);
-      as.classList.toggle('on', sellOn);
+      apply(ab, 'Auto Buy', !!auto.auto_buy_enabled);
+      apply(as, 'Auto Sell', !!auto.auto_sell_enabled);
     }
 
     function formatDuration(totalSeconds) {
@@ -1295,18 +1365,17 @@
       const risk = data.risk || {};
       const position = data.position || {};
       const idxLive = document.getElementById('indexLtpLive');
-      const topLtp = document.getElementById('topIndexLtp');
 
       const indexMatches = workerIndexMatchesSelection(indicator);
       if (indicator.index_ltp != null && Number(indicator.index_ltp) > 0) {
-        const name = indicator.index_name ? `${indicator.index_name} ` : '';
-        const ltpText = `${name}LTP ${Number(indicator.index_ltp).toFixed(2)}`;
+        const name = indicator.index_name ? indicator.index_name.trim() : getSelectedBaseIndex();
+        const ltpText = `${name} LTP ${Number(indicator.index_ltp).toFixed(2)}`;
         let liveNote = `${ltpText} (snapshot)`;
         if (!indexMatches && getSelectedBaseIndex() === 'SENSEX') {
           liveNote += ' — enter Sensex LTP below for Suggest';
         }
         idxLive.textContent = liveNote;
-        if (topLtp) topLtp.textContent = ltpText;
+        setTopIndexLtp(name, indicator.index_ltp);
         if (indexMatches) {
           document.getElementById('indexLtp').value = indicator.index_ltp;
           const manual = document.getElementById('indexLtpManual');
@@ -1314,7 +1383,7 @@
         }
       } else {
         idxLive.textContent = 'Index LTP: — (enter manually for Suggest)';
-        if (topLtp) topLtp.textContent = 'LTP: —';
+        setTopIndexLtp(getSelectedBaseIndex(), null);
       }
 
       renderAutomation(data.automation);
@@ -1636,6 +1705,7 @@
         document.getElementById('suggestedSymbol').textContent = `Suggested: ${j.symbol}`;
         document.getElementById('suggestedSymbol').className = 'green';
         tradeSymbolEl.value = j.symbol;
+        syncExpiryFromSymbol();
       } catch (e) {
         document.getElementById('suggestedSymbol').textContent = `Suggest: ${String(e?.message || e)}`;
         document.getElementById('suggestedSymbol').className = 'red';
@@ -1690,6 +1760,13 @@
 
     bindClick(document.getElementById('strikeUp'), () => bumpStrike(1));
     bindClick(document.getElementById('strikeDown'), () => bumpStrike(-1));
+    bindClick(document.getElementById('lotsDec'), () => bumpLots(-1));
+    bindClick(document.getElementById('lotsInc'), () => bumpLots(1));
+    if (tradeLotsEl) {
+      tradeLotsEl.addEventListener('change', () => {
+        tradeLotsEl.value = String(clampLots(tradeLotsEl.value));
+      });
+    }
     bindClick(suggestBtn, () => { suggestSymbol(); });
     if (strikeOffsetEl) {
       strikeOffsetEl.addEventListener('change', () => {
@@ -1700,6 +1777,7 @@
     if (baseSymbolEl) {
       baseSymbolEl.addEventListener('change', async () => {
         persistBaseIndexSelection();
+        updateSummaryLtpLabel(getSelectedBaseIndex());
         document.getElementById('indexLtp').value = '';
         const manual = document.getElementById('indexLtpManual');
         if (manual && !manual.matches(':focus')) manual.value = '';
@@ -1707,17 +1785,21 @@
       });
     }
 
+    if (tradeSymbolEl) {
+      tradeSymbolEl.addEventListener('change', syncExpiryFromSymbol);
+      tradeSymbolEl.addEventListener('blur', syncExpiryFromSymbol);
+    }
+
     bindClick(buyBtn, () => executeTrade('BUY'));
     bindClick(exitBtn, () => executeTrade('EXIT'));
 
-    bindClick(cePeBtn, async () => {
-      const optEl = document.getElementById('optionType');
-      const next = optEl.value === 'CE' ? 'PE' : 'CE';
-      optEl.value = next;
-      syncCePeButton();
-      const cur = tradeSymbolEl.value.trim();
-      if (cur) tradeSymbolEl.value = updateSymbolOption(cur, next);
-      if (getIndexLtpValue() > 0) await suggestSymbol();
+    bindClick(peTypeBtn, () => { setOptionType('PE'); });
+    bindClick(ceTypeBtn, () => { setOptionType('CE'); });
+
+    const settingsBtn = document.getElementById('settingsBtn');
+    bindClick(settingsBtn, () => {
+      const panel = document.querySelector('.web-connect');
+      if (panel) panel.open = !panel.open;
     });
 
     let saved = '';
@@ -1728,7 +1810,9 @@
     }
     tokenEl.value = saved;
     initBaseIndexFromStorage();
-    syncCePeButton();
+    updateSummaryLtpLabel(getSelectedBaseIndex());
+    syncOptionTypeButtons();
+    syncExpiryFromSymbol();
 
     (function startTopClock() {
       const el = document.getElementById('topClock');
