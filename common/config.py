@@ -20,9 +20,22 @@ DEFAULT_TRADING_SYMBOL = "NIFTY"
 
 from datetime import datetime, timedelta
 
+def _format_neo_expiry(expiry: datetime) -> str:
+    """
+    Kotak trading symbols:
+    - Monthly expiry (last expiry weekday of the month): YYMMM, e.g. 26SEP.
+      The weekly code does not exist for that date.
+    - Other weeklies: YYMDD with month not zero-padded, e.g. 26917 for 2026-09-17.
+    """
+    next_week = expiry + timedelta(days=7)
+    if next_week.month != expiry.month:
+        return expiry.strftime("%y%b").upper()
+    return f"{expiry:%y}{expiry.month}{expiry:%d}"
+
+
 def get_next_expiry(symbol: str) -> str:
     """
-    Returns the nearest expiry date string (YYMDD) for the given symbol.
+    Returns the nearest expiry token for the given symbol.
     NIFTY: Tuesday expiry, SENSEX: Thursday expiry.
     If today is expiry day and before 3:30pm, use today. Otherwise, use next week.
     """
@@ -48,8 +61,7 @@ def get_next_expiry(symbol: str) -> str:
     elif weekday == expiry_weekday and now >= expiry_time:
         expiry = now + timedelta(days=7)
     # Otherwise, expiry is this week's upcoming expiry weekday
-    # Neo symbols now use YYMDD (month without leading zero), e.g. 26813 for 2026-08-13.
-    expiry_str = f"{expiry:%y}{expiry.month}{expiry:%d}"
+    expiry_str = _format_neo_expiry(expiry)
     print(f"[DEBUG] get_next_expiry called: now={now}, symbol={symbol}, expiry_str={expiry_str}")
     return expiry_str
 
