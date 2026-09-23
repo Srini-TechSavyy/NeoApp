@@ -758,11 +758,11 @@
         </div>
         <div class="row ltp-row">
           <label for="indexLtpManual">Index LTP</label>
-          <input id="indexLtpManual" type="number" step="0.05" placeholder="From snapshot or type manually" />
-          <span class="muted ltp-hint">Used only for Suggest (not displayed as live quote)</span>
+          <input id="indexLtpManual" type="number" step="0.05" placeholder="Auto-filled on index change" />
+          <span class="muted ltp-hint">Fetched from broker for Suggest; editable override</span>
         </div>
         <div class="muted connect-endpoints">
-          <code>/api/monitor/snapshot</code> · <code>/ws/monitor</code> · <code>/api/trade/action</code>
+          <code>/api/index/ltp</code> · <code>/api/monitor/snapshot</code> · <code>/ws/monitor</code> · <code>/api/trade/action</code>
         </div>
         <div id="message" class="muted">Click Connect to stream live worker data (no mock quotes).</div>
         <div id="suggestedSymbol" class="muted"></div>
@@ -797,6 +797,7 @@
     const strikeOffsetEl = document.getElementById('strikeOffset');
     const baseSymbolEl = document.getElementById('baseSymbol');
     const BASE_INDEX_STORAGE_KEY = 'neo_web_base_index';
+    let indexLtpFetchGen = 0;
 
     function getSelectedBaseIndex() {
       const raw = baseSymbolEl?.value || 'NIFTY';
@@ -842,6 +843,60 @@
       if (Number.isFinite(hidden) && hidden > 0) return hidden;
       if (Number.isFinite(manual) && manual > 0) return manual;
       return 0;
+    }
+
+    function applyIndexLtpFields(ltp) {
+      const n = Number(ltp);
+      if (!Number.isFinite(n) || n <= 0) return;
+      const hidden = document.getElementById('indexLtp');
+      if (hidden) hidden.value = String(n);
+      const manual = document.getElementById('indexLtpManual');
+      if (manual && !manual.matches(':focus')) manual.value = String(n);
+    }
+
+    async function fetchIndexLtpForSelectedIndex(opts = {}) {
+      const suggestAfter = opts.suggestAfter !== false;
+      const token = tokenEl.value.trim();
+      const base_symbol = getSelectedBaseIndex();
+      const myGen = ++indexLtpFetchGen;
+      const suggestedEl = document.getElementById('suggestedSymbol');
+      try {
+        const r = await fetch(
+          `/api/index/ltp?base_symbol=${encodeURIComponent(base_symbol)}`,
+          { headers: token ? { 'X-API-Key': token } : {} }
+        );
+        const j = await r.json().catch(() => ({}));
+        if (myGen !== indexLtpFetchGen) return false;
+        if (!r.ok) {
+          const d = j?.detail || `Index LTP fetch failed (${r.status})`;
+          if (suggestedEl) {
+            suggestedEl.textContent = `Index LTP: ${d}`;
+            suggestedEl.className = 'red';
+          }
+          return false;
+        }
+        applyIndexLtpFields(j.index_ltp);
+        const idxLive = document.getElementById('indexLtpLive');
+        const topLtp = document.getElementById('topIndexLtp');
+        const name = j.index_name ? `${j.index_name} ` : `${base_symbol} `;
+        const ltpText = `${name}LTP ${Number(j.index_ltp).toFixed(2)}`;
+        if (idxLive) idxLive.textContent = `${ltpText} (broker)`;
+        if (topLtp) topLtp.textContent = ltpText;
+        if (suggestAfter) await suggestSymbol({ skipLtpFetch: true });
+        return true;
+      } catch (e) {
+        if (myGen !== indexLtpFetchGen) return false;
+        if (suggestedEl) {
+          suggestedEl.textContent = `Index LTP: ${String(e?.message || e)}`;
+          suggestedEl.className = 'red';
+        }
+        return false;
+      }
+    }
+
+    async function ensureIndexLtpFromBroker() {
+      if (getIndexLtpValue() > 0) return true;
+      return await fetchIndexLtpForSelectedIndex({ suggestAfter: false });
     }
 
     function initOffsetOptions() {
@@ -1541,15 +1596,26 @@
       }
     }
 
-    async function suggestSymbol() {
+    async function suggestSymbol(opts = {}) {
       const token = tokenEl.value.trim();
       const base_symbol = getSelectedBaseIndex();
       const option_type = document.getElementById('optionType').value;
-      const index_ltp = getIndexLtpValue();
+      let index_ltp = getIndexLtpValue();
       const offset = Number(strikeOffsetEl?.value || '0');
 
-      if (!Number.isFinite(index_ltp) || index_ltp <= 0) {
-        document.getElementById('suggestedSymbol').textContent = 'Suggest: need index LTP from snapshot or worker live';
+      if ((!Number.isFinite(index_ltp) || index_ltp <= 0) && !opts.skipLtpFetch) {
+        const ok = await ensureIndexLtpFromBroker();
+        index_ltp = getIndexLtpValue();
+        if (!ok || !Number.isFinite(index_ltp) || index_ltp <= 0) {
+          const suggestedEl = document.getElementById('suggestedSymbol');
+          if (suggestedEl && !suggestedEl.textContent.startsWith('Index LTP:')) {
+            suggestedEl.textContent = 'Suggest: connect and pick index, or enter LTP manually';
+            suggestedEl.className = 'red';
+          }
+          return;
+        }
+      } else if (!Number.isFinite(index_ltp) || index_ltp <= 0) {
+        document.getElementById('suggestedSymbol').textContent = 'Suggest: connect and pick index, or enter LTP manually';
         document.getElementById('suggestedSymbol').className = 'red';
         return;
       }
@@ -1613,6 +1679,7 @@
       try {
         await loadSnapshot(token);
         await loadSystemStatus(token);
+        await fetchIndexLtpForSelectedIndex({ suggestAfter: true });
         connectWs(token);
       } catch (e) {
         setStatus(String(e.message || e), 'red');
@@ -1633,16 +1700,10 @@
     if (baseSymbolEl) {
       baseSymbolEl.addEventListener('change', async () => {
         persistBaseIndexSelection();
-        const suggestedEl = document.getElementById('suggestedSymbol');
-        if (getIndexLtpValue() > 0) {
-          await suggestSymbol();
-        } else if (suggestedEl) {
-          const hint = getSelectedBaseIndex() === 'SENSEX'
-            ? 'Select SENSEX: enter Index LTP manually (worker may still stream Nifty).'
-            : 'Enter Index LTP or connect worker for live Nifty LTP.';
-          suggestedEl.textContent = hint;
-          suggestedEl.className = 'muted';
-        }
+        document.getElementById('indexLtp').value = '';
+        const manual = document.getElementById('indexLtpManual');
+        if (manual && !manual.matches(':focus')) manual.value = '';
+        await fetchIndexLtpForSelectedIndex({ suggestAfter: true });
       });
     }
 

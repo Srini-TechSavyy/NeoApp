@@ -194,6 +194,8 @@ class TradePayloadAndFrontendTests(unittest.TestCase):
 
         # Explicit Suggest button binding still present
         self.assertIn("bindClick(suggestBtn, () => { suggestSymbol(); });", html)
+        self.assertIn("async function fetchIndexLtpForSelectedIndex", html)
+        self.assertIn("/api/index/ltp", html)
 
         # Trade payload shape unchanged
         self.assertIn(

@@ -95,3 +95,10 @@ class SuggestSymbolResponse(BaseModel):
     base_symbol: str
     option_type: str
     offset: int
+
+
+class IndexLtpResponse(BaseModel):
+    ok: bool
+    base_symbol: str
+    index_ltp: float = Field(gt=0)
+    index_name: Optional[str] = None

@@ -18,7 +18,8 @@ from indicator.scalping_indicator import LiveScalpingManager, RSIMomentumStrateg
 from monitor.pnl_engine import PositionPnLEngine, parse_api_orders
 from web.shared.monitor_snapshot import build_monitor_snapshot
 from web.shared.risk_controls import evaluate_risk_state
-from web.shared.symbol_helpers import get_underlying_index, suggest_option_symbol
+from web.shared.index_quotes import fetch_index_ltp
+from web.shared.symbol_helpers import suggest_option_symbol
 from web.shared.state_store import write_snapshot
 from web.shared.trade_orders import refresh_pending_orders
 from web.shared.trading_actions import execute_market_action
@@ -100,27 +101,6 @@ def _extract_open_position(client):
                 "exchange": exch,
             }
     return None
-
-
-def _fetch_index_ltp(client, symbol_hint: str):
-    idx_token, idx_exch, idx_name = get_underlying_index(symbol_hint)
-    if not idx_token:
-        idx_token, idx_exch, idx_name = get_underlying_index(AUTO_BASE_INDEX)
-    if not idx_token:
-        return 0.0, None, None, None
-
-    quote_resp = client.quotes(instrument_tokens=[{"instrument_token": idx_token, "exchange_segment": idx_exch}], quote_type="ltp")
-    ltp = 0.0
-    if isinstance(quote_resp, list) and quote_resp:
-        ltp = float(quote_resp[0].get("ltp", 0) or 0)
-    elif isinstance(quote_resp, dict):
-        data = quote_resp.get("data", [])
-        if isinstance(data, list) and data:
-            ltp = float(data[0].get("ltp", 0) or 0)
-        elif "ltp" in quote_resp:
-            ltp = float(quote_resp.get("ltp", 0) or 0)
-
-    return ltp, idx_token, idx_exch, idx_name
 
 
 def _fetch_option_ltp(client, trading_symbol: str) -> float:
@@ -222,7 +202,9 @@ def _run_once(client, manager: LiveScalpingManager, runtime_state: dict):
     open_pos = _extract_open_position(client)
 
     symbol_for_index = open_pos["symbol"] if open_pos else AUTO_BASE_INDEX
-    idx_ltp, _, _, idx_name = _fetch_index_ltp(client, symbol_for_index)
+    idx_ltp, _, _, idx_name = fetch_index_ltp(client, symbol_for_index)
+    if idx_ltp <= 0:
+        idx_ltp, _, _, idx_name = fetch_index_ltp(client, AUTO_BASE_INDEX)
     if idx_ltp > 0:
         manager.add_ltp(idx_ltp, idx_name or AUTO_BASE_INDEX)
     indicator_data = manager.get_signal()

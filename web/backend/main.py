@@ -27,6 +27,7 @@ from web.backend.auth import (
 )
 from web.backend.models import (
     HealthResponse,
+    IndexLtpResponse,
     MonitorSnapshotData,
     MonitorSnapshotResponse,
     SuggestSymbolRequest,
@@ -35,6 +36,7 @@ from web.backend.models import (
     TradeActionRequest,
     TradeActionResponse,
 )
+from web.shared.index_quotes import fetch_index_ltp_for_base
 from web.shared.symbol_helpers import suggest_option_symbol
 from web.shared.state_store import read_snapshot
 from web.shared.trade_latency import TradeLatencyRecorder, latency_enabled
@@ -300,6 +302,27 @@ def trade_action(payload: TradeActionRequest, request: Request):
         latency.flush(action=payload.action, symbol=payload.trading_symbol)
 
     return api_response
+
+
+@app.get("/api/index/ltp", dependencies=[Depends(require_api_key)], response_model=IndexLtpResponse)
+def index_ltp(base_symbol: str):
+    base = str(base_symbol or "").strip().upper().replace("NIFTY_50", "NIFTY")
+    if base not in ("NIFTY", "SENSEX"):
+        raise HTTPException(status_code=400, detail="base_symbol must be NIFTY or SENSEX")
+    try:
+        ltp, idx_name = fetch_index_ltp_for_base(base)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Index LTP fetch failed for %s", base)
+        raise HTTPException(status_code=502, detail=f"Index LTP fetch failed: {exc}") from exc
+
+    return IndexLtpResponse(
+        ok=True,
+        base_symbol=base,
+        index_ltp=ltp,
+        index_name=idx_name,
+    )
 
 
 @app.post("/api/symbol/suggest", dependencies=[Depends(require_api_key)], response_model=SuggestSymbolResponse)
