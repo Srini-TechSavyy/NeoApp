@@ -139,7 +139,42 @@ class ScripMasterSessionReuseTests(unittest.TestCase):
 
         mock_get_client.assert_called()
         mock_ensure_login.assert_not_called()
-        existing.scrip_master.assert_called_once_with(exchange_segment="nse_fo")
+        existing.scrip_master.assert_any_call(exchange_segment="nse_fo")
+        existing.scrip_master.assert_any_call(exchange_segment="bse_fo")
+
+    def test_download_refreshes_only_stale_segments(self):
+        import common.scrip_master as sm
+
+        existing = MagicMock()
+        existing.access_token = "tok"
+        existing.scrip_master.return_value = "https://example.test/bse_fo.csv"
+
+        def exists(path):
+            return path == "/tmp/neo_fresh_nse_fo.csv"
+
+        def mtime(path):
+            self.assertEqual(path, "/tmp/neo_fresh_nse_fo.csv")
+            return time.time()
+
+        with patch.object(sm, "NSE_SCRIP_MASTER_PATH", "/tmp/neo_fresh_nse_fo.csv"), patch.object(
+            sm, "BSE_SCRIP_MASTER_PATH", "/tmp/neo_stale_bse_fo.csv"
+        ), patch(
+            "common.orders.get_client", return_value=existing
+        ), patch(
+            "common.orders.ensure_login"
+        ) as mock_ensure_login, patch(
+            "common.scrip_master.requests.get"
+        ) as mock_get, patch("os.path.exists", side_effect=exists), patch(
+            "os.path.getmtime", side_effect=mtime
+        ), patch("pandas.read_csv", side_effect=FileNotFoundError("skip load")):
+            mock_get.return_value = MagicMock(status_code=500, content=b"")
+            try:
+                sm.load_scrip_master_csv(paths=[])
+            except FileNotFoundError:
+                pass
+
+        mock_ensure_login.assert_not_called()
+        existing.scrip_master.assert_called_once_with(exchange_segment="bse_fo")
 
 
 class TradePayloadAndFrontendTests(unittest.TestCase):

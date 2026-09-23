@@ -11,47 +11,69 @@ import requests
 _scrip_master_df: Optional[pd.DataFrame] = None
 _token_cache: dict = {}
 
+def _scrip_master_files():
+    """Resolve paths at call time so tests can patch the path constants."""
+    return (
+        ("nse_fo", NSE_SCRIP_MASTER_PATH, "NSE"),
+        ("bse_fo", BSE_SCRIP_MASTER_PATH, "BSE"),
+    )
+
+
+def _scrip_master_is_current(path: str) -> bool:
+    if not os.path.exists(path):
+        return False
+    mdate = datetime.fromtimestamp(os.path.getmtime(path)).date()
+    return mdate == datetime.now().date()
+
+
+def _refresh_stale_scrip_masters(log_cb=None) -> None:
+    """Download any scrip master that is missing or not from today."""
+    stale = [
+        (segment, path, label)
+        for segment, path, label in _scrip_master_files()
+        if not _scrip_master_is_current(path)
+    ]
+    if not stale:
+        return
+
+    labels = ", ".join(label for _, _, label in stale)
+    log_with_callback(log_cb, f"Scrip master outdated ({labels}). Downloading latest from Kotak...")
+    try:
+        # Prefer an existing authenticated session to avoid a second broker login.
+        # Lazy import avoids circular import with common.orders.
+        from .orders import ensure_login, get_client
+
+        client = get_client()
+        if client is None:
+            client = ensure_login(log_cb=log_cb)
+        headers = {"Authorization": f"Bearer {client.access_token}"} if hasattr(client, "access_token") else {}
+        for segment, path, label in stale:
+            url = client.scrip_master(exchange_segment=segment)
+            if not isinstance(url, str) or not url.startswith("http"):
+                log_with_callback(log_cb, f"Failed to resolve {label} scrip master URL: {url}")
+                continue
+            resp = requests.get(url, headers=headers, timeout=30)
+            if resp.status_code == 200 and resp.content:
+                with open(path, "wb") as f:
+                    f.write(resp.content)
+                log_with_callback(log_cb, f"Successfully downloaded new {label} scrip master!")
+            else:
+                log_with_callback(log_cb, f"Failed to download {label} scrip master. HTTP Details: {resp.status_code}")
+    except Exception as dl_err:
+        log_with_callback(log_cb, f"Download scrip master error: {dl_err}")
+
+
 def load_scrip_master_csv(paths: Optional[list] = None, log_cb=None) -> None:
     """
     Load local scrip master CSVs and merge them.
     Normalizes column names to lowercase and strips semicolons.
     """
     global _scrip_master_df, _token_cache
-    
-    # --- Auto Update Scrip Master Logic ---
-    try:
-        # Check if nse_fo.csv is older than today
-        needs_update = True
-        if os.path.exists(NSE_SCRIP_MASTER_PATH):
-            mtime = os.path.getmtime(NSE_SCRIP_MASTER_PATH)
-            mdate = datetime.fromtimestamp(mtime).date()
-            if mdate == datetime.now().date():
-                needs_update = False
-        
-        if needs_update:
-            log_with_callback(log_cb, "Scrip master is outdated. Downloading latest from Kotak...")
-            try:
-                # Prefer an existing authenticated session to avoid a second broker login.
-                # Lazy import avoids circular import with common.orders.
-                from .orders import ensure_login, get_client
 
-                client = get_client()
-                if client is None:
-                    client = ensure_login(log_cb=log_cb)
-                url = client.scrip_master(exchange_segment="nse_fo")
-                headers = {"Authorization": f"Bearer {client.access_token}"} if hasattr(client, 'access_token') else {}
-                resp = requests.get(url, headers=headers, timeout=30)
-                if resp.status_code == 200:
-                    with open(NSE_SCRIP_MASTER_PATH, 'wb') as f:
-                        f.write(resp.content)
-                    log_with_callback(log_cb, "Successfully downloaded new NSE scrip master!")
-                else:
-                    log_with_callback(log_cb, f"Failed to download scrip master. HTTP Details: {resp.status_code}")
-            except Exception as dl_err:
-                log_with_callback(log_cb, f"Download scrip master error: {dl_err}")
+    try:
+        _refresh_stale_scrip_masters(log_cb=log_cb)
     except Exception as e:
         log_with_callback(log_cb, f"Scrip master update check failed: {e}")
-    # --------------------------------------
 
     target_paths = paths or [NSE_SCRIP_MASTER_PATH, BSE_SCRIP_MASTER_PATH]
     
