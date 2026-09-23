@@ -332,6 +332,7 @@
     }
     .strike-row .offset-label { font-size: 11px; margin-left: 6px; }
     #strikeOffset { width: 88px; }
+    #baseSymbol { width: 88px; min-width: 0; }
     #suggestBtn { margin-left: 0; }
     #tradeSymbol { min-width: 0; width: 100%; flex: 1; }
     #token { min-width: 220px; }
@@ -679,6 +680,13 @@
       <div class="form-grid">
         <div class="trade-strip">
           <div class="strip-controls-row">
+            <div class="strip-cell strip-index">
+              <span class="strip-lbl">Index</span>
+              <select id="baseSymbol" aria-label="Index">
+                <option value="NIFTY">NIFTY</option>
+                <option value="SENSEX">SENSEX</option>
+              </select>
+            </div>
             <div class="strip-cell strip-strike">
               <span class="strip-lbl">Strike</span>
               <div class="row-inline strike-row">
@@ -707,13 +715,6 @@
               <span class="strip-lbl">Symbol</span>
               <div class="row-inline symbol-row">
                 <input id="tradeSymbol" type="text" placeholder="NIFTY26AUG25000CE" />
-                <select id="baseSymbol" style="display:none" aria-hidden="true">
-                  <option value="NIFTY">NIFTY</option>
-                  <option value="BANKNIFTY">BANKNIFTY</option>
-                  <option value="SENSEX">SENSEX</option>
-                  <option value="FINNIFTY">FINNIFTY</option>
-                  <option value="BANKEX">BANKEX</option>
-                </select>
                 <input id="indexLtp" type="hidden" />
                 <input id="optionType" type="hidden" value="CE" />
               </div>
@@ -794,6 +795,46 @@
     const lastActionLine = document.getElementById('lastActionLine');
     const monText = document.getElementById('monText');
     const strikeOffsetEl = document.getElementById('strikeOffset');
+    const baseSymbolEl = document.getElementById('baseSymbol');
+    const BASE_INDEX_STORAGE_KEY = 'neo_web_base_index';
+
+    function getSelectedBaseIndex() {
+      const raw = baseSymbolEl?.value || 'NIFTY';
+      const v = String(raw).trim().toUpperCase();
+      return v === 'SENSEX' ? 'SENSEX' : 'NIFTY';
+    }
+
+    function initBaseIndexFromStorage() {
+      if (!baseSymbolEl) return;
+      let saved = '';
+      try {
+        saved = localStorage.getItem(BASE_INDEX_STORAGE_KEY) || '';
+      } catch (_) {
+        saved = '';
+      }
+      const v = String(saved).trim().toUpperCase();
+      if (v === 'SENSEX' || v === 'NIFTY') {
+        baseSymbolEl.value = v;
+      }
+    }
+
+    function persistBaseIndexSelection() {
+      try {
+        localStorage.setItem(BASE_INDEX_STORAGE_KEY, getSelectedBaseIndex());
+      } catch (_) {}
+    }
+
+    function indexNameToBase(name) {
+      return inferBaseSymbol(name);
+    }
+
+    function workerIndexMatchesSelection(indicator) {
+      if (!indicator || indicator.index_name == null || indicator.index_name === '') {
+        return getSelectedBaseIndex() === 'NIFTY';
+      }
+      const streamed = indexNameToBase(indicator.index_name);
+      return streamed === getSelectedBaseIndex();
+    }
 
     function getIndexLtpValue() {
       const hidden = Number(document.getElementById('indexLtp')?.value || '0');
@@ -931,6 +972,7 @@
       if (s.includes('FINNIFTY') || s.includes('FIN')) return 'FINNIFTY';
       if (s.includes('BANKEX')) return 'BANKEX';
       if (s.includes('SENSEX') || s.includes('BSX')) return 'SENSEX';
+      if (s.includes('NIFTY 50') || s.includes('NIFTY50')) return 'NIFTY';
       return 'NIFTY';
     }
 
@@ -951,7 +993,7 @@
         setTradeResult('Enter a symbol before adjusting strike.', 'red');
         return;
       }
-      const step = detectStrikeStep(cur);
+      const step = detectStrikeStep(cur || getSelectedBaseIndex());
       const parts = parseSymbolParts(cur);
       if (!parts) {
         setTradeResult('Strike adjust: symbol format not recognized.', 'red');
@@ -982,7 +1024,7 @@
       if (!parts) return;
       const optionType = document.getElementById('optionType')?.value || parts.opt;
       const offset = Number(strikeOffsetEl?.value || '0');
-      const expected = expectedAtmStrike(ltp, cur, optionType, offset);
+      const expected = expectedAtmStrike(ltp, cur || getSelectedBaseIndex(), optionType, offset);
       if (!Number.isFinite(expected) || expected <= 0 || parts.strike === expected) return;
       tradeSymbolEl.value = updateSymbolStrike(cur, expected);
     }
@@ -1200,15 +1242,21 @@
       const idxLive = document.getElementById('indexLtpLive');
       const topLtp = document.getElementById('topIndexLtp');
 
+      const indexMatches = workerIndexMatchesSelection(indicator);
       if (indicator.index_ltp != null && Number(indicator.index_ltp) > 0) {
         const name = indicator.index_name ? `${indicator.index_name} ` : '';
         const ltpText = `${name}LTP ${Number(indicator.index_ltp).toFixed(2)}`;
-        idxLive.textContent = `${ltpText} (snapshot)`;
+        let liveNote = `${ltpText} (snapshot)`;
+        if (!indexMatches && getSelectedBaseIndex() === 'SENSEX') {
+          liveNote += ' — enter Sensex LTP below for Suggest';
+        }
+        idxLive.textContent = liveNote;
         if (topLtp) topLtp.textContent = ltpText;
-        document.getElementById('indexLtp').value = indicator.index_ltp;
-        const manual = document.getElementById('indexLtpManual');
-        if (manual && !manual.matches(':focus')) manual.value = indicator.index_ltp;
-        document.getElementById('baseSymbol').value = inferBaseSymbol(indicator.index_name || tradeSymbolEl.value);
+        if (indexMatches) {
+          document.getElementById('indexLtp').value = indicator.index_ltp;
+          const manual = document.getElementById('indexLtpManual');
+          if (manual && !manual.matches(':focus')) manual.value = indicator.index_ltp;
+        }
       } else {
         idxLive.textContent = 'Index LTP: — (enter manually for Suggest)';
         if (topLtp) topLtp.textContent = 'LTP: —';
@@ -1229,7 +1277,7 @@
       }
 
       const liveLtp = Number(indicator.index_ltp);
-      if (Number.isFinite(liveLtp) && liveLtp > 0) {
+      if (indexMatches && Number.isFinite(liveLtp) && liveLtp > 0) {
         refreshAtmStrikeFromLtp(liveLtp, positionOpen);
       }
 
@@ -1495,8 +1543,7 @@
 
     async function suggestSymbol() {
       const token = tokenEl.value.trim();
-      const base_symbol = inferBaseSymbol(tradeSymbolEl.value || document.getElementById('baseSymbol').value);
-      document.getElementById('baseSymbol').value = base_symbol;
+      const base_symbol = getSelectedBaseIndex();
       const option_type = document.getElementById('optionType').value;
       const index_ltp = getIndexLtpValue();
       const offset = Number(strikeOffsetEl?.value || '0');
@@ -1583,6 +1630,22 @@
       });
     }
 
+    if (baseSymbolEl) {
+      baseSymbolEl.addEventListener('change', async () => {
+        persistBaseIndexSelection();
+        const suggestedEl = document.getElementById('suggestedSymbol');
+        if (getIndexLtpValue() > 0) {
+          await suggestSymbol();
+        } else if (suggestedEl) {
+          const hint = getSelectedBaseIndex() === 'SENSEX'
+            ? 'Select SENSEX: enter Index LTP manually (worker may still stream Nifty).'
+            : 'Enter Index LTP or connect worker for live Nifty LTP.';
+          suggestedEl.textContent = hint;
+          suggestedEl.className = 'muted';
+        }
+      });
+    }
+
     bindClick(buyBtn, () => executeTrade('BUY'));
     bindClick(exitBtn, () => executeTrade('EXIT'));
 
@@ -1603,6 +1666,7 @@
       saved = '';
     }
     tokenEl.value = saved;
+    initBaseIndexFromStorage();
     syncCePeButton();
 
     (function startTopClock() {
