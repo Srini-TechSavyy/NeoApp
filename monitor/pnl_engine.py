@@ -1,7 +1,7 @@
 from collections import defaultdict, deque
 from datetime import datetime
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import Dict, List, Optional, Tuple
 
 # =========================
 # Trade Model
@@ -111,76 +111,258 @@ class PnLEngine:
 # =========================
 # API Adapter
 # =========================
+_FILLED_STATUSES = frozenset(
+    {"complete", "completed", "filled", "traded", "executed"}
+)
+
+_TIMESTAMP_FORMATS = (
+    "%d-%b-%Y %H:%M:%S",
+    "%Y/%m/%d %H:%M:%S",
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d %H:%M:%S.%f",
+)
+
+
+def _order_row_status(o: dict) -> str:
+    for key in ("ordSt", "ordStatus", "stat", "status"):
+        raw = o.get(key)
+        if raw is not None and str(raw).strip():
+            return str(raw).lower().strip()
+    return ""
+
+
+def _is_filled_order_row(o: dict) -> bool:
+    status = _order_row_status(o)
+    if status in _FILLED_STATUSES:
+        return True
+    # Some rows only expose remaining qty on the order book.
+    try:
+        unfilled = float(o.get("unFldSz") or o.get("flQtyRem") or -1)
+        filled = float(o.get("fldQty") or o.get("flQty") or o.get("qty") or 0)
+        if unfilled == 0 and filled > 0:
+            return True
+    except (TypeError, ValueError):
+        pass
+    return False
+
+
+def _parse_trade_timestamp(o: dict) -> datetime:
+    ts_raw = str(
+        o.get("exCfmTm", "")
+        or o.get("ordTm", "")
+        or o.get("ordEntTm", "")
+        or o.get("hsUpTm", "")
+        or o.get("exTm", "")
+        or o.get("updRecvTm", "")
+        or ""
+    ).strip()
+    if not ts_raw:
+        fl_dt = str(o.get("flDt", "")).strip()
+        fl_tm = str(o.get("flTm", "")).strip()
+        if fl_dt and fl_tm:
+            ts_raw = f"{fl_dt} {fl_tm}"
+    if ts_raw:
+        ts = " ".join(ts_raw.split())
+        for fmt in _TIMESTAMP_FORMATS:
+            try:
+                return datetime.strptime(ts, fmt)
+            except ValueError:
+                continue
+    return datetime.now()
+
+
+def _parse_transaction_side(o: dict) -> str:
+    raw = str(
+        o.get("trnsTp", "")
+        or o.get("side", "")
+        or o.get("transaction_type", "")
+        or o.get("txnType", "")
+    ).upper()
+    if "BUY" in raw or raw == "B":
+        return "B"
+    if "SELL" in raw or raw == "S":
+        return "S"
+    if raw:
+        return raw[0]
+    return "B"
+
+
+def _parse_avg_price(o: dict) -> float:
+    for key in (
+        "avgPrc",
+        "buyAvgPrc",
+        "sellAvgPrc",
+        "executionPrice",
+        "prc",
+        "lastRate",
+    ):
+        val = o.get(key)
+        if val is None or val == "":
+            continue
+        try:
+            price = float(val)
+        except (TypeError, ValueError):
+            continue
+        if price > 0:
+            return price
+    try:
+        amt = float(o.get("buyAmt") or o.get("sellAmt") or 0)
+        f_qty = float(
+            o.get("fldQty")
+            or o.get("flQty")
+            or o.get("flBuyQty")
+            or o.get("flSellQty")
+            or o.get("executionQty")
+            or o.get("filledQty")
+            or o.get("qty")
+            or 0
+        )
+        if f_qty > 0 and amt > 0:
+            return amt / f_qty
+    except (TypeError, ValueError):
+        pass
+    return 0.0
+
+
+def _parse_trade_qty(o: dict, *, fills: bool = False) -> int:
+    if fills:
+        q_val = (
+            o.get("fldQty")
+            or o.get("executionQty")
+            or o.get("filledQty")
+            or o.get("flQty")
+            or o.get("qty")
+            or 0
+        )
+    else:
+        q_val = (
+            o.get("fldQty")
+            or o.get("flQty")
+            or o.get("executionQty")
+            or o.get("filledQty")
+            or o.get("qty")
+            or o.get("flBuyQty")
+            or o.get("flSellQty")
+            or 0
+        )
+    try:
+        return int(float(str(q_val)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _row_to_trade(o: dict, *, fills: bool = False) -> Optional[Trade]:
+    avg_price = _parse_avg_price(o)
+    if avg_price <= 0:
+        return None
+    qty = _parse_trade_qty(o, fills=fills)
+    if qty <= 0:
+        return None
+    symbol = str(o.get("trdSym") or o.get("trading_symbol") or o.get("sym") or "").strip().upper()
+    if not symbol:
+        return None
+    return Trade(
+        symbol=symbol,
+        side=_parse_transaction_side(o),
+        qty=qty,
+        price=avg_price,
+        time=_parse_trade_timestamp(o),
+        product=str(o.get("prod", "MIS")),
+        segment=str(o.get("exSeg", "") or o.get("exch", "")),
+        order_id=str(o.get("nOrdNo", "")),
+        order_source=str(o.get("ordSrc", "NA")),
+    )
+
+
 def parse_api_orders(api_data: List[dict]) -> List[Trade]:
     trades = []
-
     for o in api_data:
-        # DBG: Print full order object to finding source field
-        # if o == api_data[0]: print(f"DEBUG: Order Object Structure: {o}")
-        raw_status = str(o.get("ordSt", ""))
-        status = raw_status.lower()
-        if status not in ["complete", "completed", "filled"]:
+        if not _is_filled_order_row(o):
             continue
-
-        # Try multiple price keys for BSE/SENSEX compatibility
-        avg_price = float(o.get("avgPrc") or o.get("buyAvgPrc") or o.get("sellAvgPrc") or 0)
-        
-        # Fallback: Calculate from Amount and Qty
-        if avg_price == 0:
-            try:
-                amt = float(o.get("buyAmt") or o.get("sellAmt") or 0)
-                # Use filled qty primarily for price calculation if avgPrc is 0
-                f_qty = float(o.get("flQty") or o.get("flBuyQty") or o.get("flSellQty") or o.get("qty") or 0)
-                if f_qty > 0: avg_price = amt / f_qty
-            except: pass
-
-        if avg_price == 0:
-            continue
-
-        # Flexible Timestamp Parsing
-        trade_time = datetime.now()
-        # BSE often uses hsUpTm or updRecvTm
-        ts_raw = str(o.get("exCfmTm", "") or o.get("ordTm", "") or o.get("updRecvTm", "") or o.get("hsUpTm", ""))
-        if ts_raw:
-            ts = ' '.join(ts_raw.split())
-            # FIX: Corrected %Y/%m/%d format
-            formats = ["%d-%b-%Y %H:%M:%S", "%Y/%m/%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"]
-            for fmt in formats:
-                try:
-                    trade_time = datetime.strptime(ts, fmt)
-                    break
-                except: continue
-
-        # Normalize side to B / S
-        side = str(o.get("trnsTp", "")).upper()
-        if "BUY" in side or side == "B": side = "B"
-        elif "SELL" in side or side == "S": side = "S"
-        else: side = side[0] if side else "B" # Fallback to first char
-
-        # Quantity: Prefer filled quantity (flQty) for completed trades
-        q_val = o.get("flQty") or o.get("qty") or o.get("flBuyQty") or o.get("flSellQty") or 0
-        try:
-            qty = int(float(str(q_val)))
-        except:
-            qty = 0
-
-        if qty == 0:
-            continue
-
-        trade = Trade(
-            symbol=str(o.get("trdSym", "")).strip().upper(),
-            side=side,
-            qty=qty,
-            price=avg_price,
-            time=trade_time,
-            product=str(o.get("prod", "MIS")),
-            segment=str(o.get("exSeg", "")),
-            order_id=str(o.get("nOrdNo", "")),
-            order_source=str(o.get("ordSrc", "NA"))
-        )
-        trades.append(trade)
-        #print(f"DEBUG: Parsed Trade - {trade.side} {trade.qty} {trade.symbol} @ {trade.price} ({trade.time})")
+        trade = _row_to_trade(o, fills=False)
+        if trade:
+            trades.append(trade)
     return trades
+
+
+def parse_api_fills(api_data: List[dict]) -> List[Trade]:
+    """Parse Kotak trade_report rows (individual fills)."""
+    trades = []
+    for o in api_data:
+        trade = _row_to_trade(o, fills=True)
+        if trade:
+            trades.append(trade)
+    return trades
+
+
+def _completed_trade_count(trades: List[Trade]) -> int:
+    engine = PositionPnLEngine()
+    for trade in sorted(trades, key=lambda x: x.time):
+        engine.add_trade(trade)
+    return len(engine.completed_trades)
+
+
+def broker_trades_for_pnl(client) -> Tuple[List[Trade], Dict]:
+    """
+    Load today's broker executions for PnL. Prefer order_report; if that yields
+    no closed trades, fall back to trade_report fills.
+    """
+    meta: Dict = {
+        "order_report_rows": 0,
+        "trade_report_rows": 0,
+        "parsed_order_trades": 0,
+        "parsed_fill_trades": 0,
+        "completed_from_orders": 0,
+        "completed_from_fills": 0,
+        "source": "none",
+    }
+
+    report = client.order_report()
+    if isinstance(report, dict) and (report.get("Error") or report.get("Error Message")):
+        meta["order_report_error"] = str(report.get("Error") or report.get("Error Message"))
+
+    order_rows = report.get("data", []) if isinstance(report, dict) else (report or [])
+    if not isinstance(order_rows, list):
+        order_rows = []
+    meta["order_report_rows"] = len(order_rows)
+
+    order_trades = parse_api_orders(order_rows)
+    meta["parsed_order_trades"] = len(order_trades)
+    meta["completed_from_orders"] = _completed_trade_count(order_trades)
+
+    fill_rows: List[dict] = []
+    trade_report = client.trade_report()
+    if isinstance(trade_report, dict) and not (
+        trade_report.get("Error") or trade_report.get("Error Message")
+    ):
+        raw = trade_report.get("data", [])
+        if isinstance(raw, list):
+            fill_rows = raw
+    elif isinstance(trade_report, dict) and (
+        trade_report.get("Error") or trade_report.get("Error Message")
+    ):
+        meta["trade_report_error"] = str(
+            trade_report.get("Error") or trade_report.get("Error Message")
+        )
+    meta["trade_report_rows"] = len(fill_rows)
+
+    fill_trades = parse_api_fills(fill_rows)
+    meta["parsed_fill_trades"] = len(fill_trades)
+    meta["completed_from_fills"] = _completed_trade_count(fill_trades)
+
+    if meta["completed_from_orders"] > 0:
+        meta["source"] = "order_report"
+        return order_trades, meta
+    if meta["completed_from_fills"] > 0:
+        meta["source"] = "trade_report"
+        return fill_trades, meta
+    if order_trades:
+        meta["source"] = "order_report"
+        return order_trades, meta
+    if fill_trades:
+        meta["source"] = "trade_report"
+        return fill_trades, meta
+    return [], meta
 
 
 class PositionPnLEngine:

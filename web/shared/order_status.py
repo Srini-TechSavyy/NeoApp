@@ -21,7 +21,7 @@ def _execution_price_from_row(row: dict) -> Optional[float]:
 
 def normalize_broker_status(status: str) -> str:
     s = str(status or "").lower().strip()
-    if s in ("complete", "completed", "filled"):
+    if s in ("complete", "completed", "filled", "traded", "executed"):
         return "complete"
     if s in ("rejected", "reject"):
         return "rejected"

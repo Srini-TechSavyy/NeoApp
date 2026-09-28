@@ -15,7 +15,7 @@ from common.scrip_master import find_token_for_trading_symbol, get_lot_size_from
 from common.config import COOL_OFF_PERIOD
 from common.time_utils import market_time_to_epoch
 from indicator.scalping_indicator import LiveScalpingManager, RSIMomentumStrategy
-from monitor.pnl_engine import PositionPnLEngine, parse_api_orders
+from monitor.pnl_engine import PositionPnLEngine, broker_trades_for_pnl
 from web.shared.monitor_snapshot import build_monitor_snapshot
 from web.shared.risk_controls import evaluate_risk_state
 from web.shared.index_quotes import fetch_index_ltp
@@ -184,11 +184,25 @@ def _run_once(client, manager: LiveScalpingManager, runtime_state: dict):
             pending_meta.get("pending_order_refresh_ms"),
         )
 
-    report = client.order_report()
-    report_data = report.get("data", []) if isinstance(report, dict) else (report or [])
-
-    trades = parse_api_orders(report_data if isinstance(report_data, list) else [])
+    trades, broker_sync = broker_trades_for_pnl(client)
     trades.sort(key=lambda x: x.time)
+    if broker_sync.get("order_report_rows", 0) == 0 and broker_sync.get("trade_report_rows", 0) == 0:
+        logger.warning("Broker sync: no order or trade rows returned")
+    elif broker_sync.get("completed_from_orders", 0) == 0 and broker_sync.get("completed_from_fills", 0) == 0:
+        logger.warning(
+            "Broker sync: rows present but no closed trades parsed (orders=%s fills=%s)",
+            broker_sync.get("order_report_rows"),
+            broker_sync.get("trade_report_rows"),
+        )
+    else:
+        logger.info(
+            "Broker sync source=%s orders=%s fills=%s completed_orders=%s completed_fills=%s",
+            broker_sync.get("source"),
+            broker_sync.get("parsed_order_trades"),
+            broker_sync.get("parsed_fill_trades"),
+            broker_sync.get("completed_from_orders"),
+            broker_sync.get("completed_from_fills"),
+        )
 
     engine = PositionPnLEngine()
     for trade in trades:
@@ -277,6 +291,7 @@ def _run_once(client, manager: LiveScalpingManager, runtime_state: dict):
                     action_msg = f"AUTO EXIT failed: {e}"
 
     snapshot = build_monitor_snapshot(engine.completed_trades)
+    snapshot["broker_sync"] = broker_sync
     snapshot["healthy"] = True
     snapshot["message"] = "Worker cycle completed"
     snapshot["indicator"] = {
