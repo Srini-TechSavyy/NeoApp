@@ -102,3 +102,18 @@ class IndexLtpResponse(BaseModel):
     base_symbol: str
     index_ltp: float = Field(gt=0)
     index_name: Optional[str] = None
+
+
+class RiskResetResponse(BaseModel):
+    ok: bool
+    action: str
+    message: str
+    timestamp: str
+
+
+class BrokerSessionResetResponse(BaseModel):
+    ok: bool
+    worker_notified: bool
+    api_relogin: Literal["success", "failed", "skipped"]
+    message: str
+    timestamp: str

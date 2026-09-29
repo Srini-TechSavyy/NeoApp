@@ -26,16 +26,21 @@ from web.backend.auth import (
     require_ws_token,
 )
 from web.backend.models import (
+    BrokerSessionResetResponse,
     HealthResponse,
     IndexLtpResponse,
     MonitorSnapshotData,
     MonitorSnapshotResponse,
+    RiskResetResponse,
     SuggestSymbolRequest,
     SuggestSymbolResponse,
     SystemStatusResponse,
     TradeActionRequest,
     TradeActionResponse,
 )
+from common.orders import ensure_login, reset_neo_client_cache
+from web.shared.broker_session_reset import request_broker_session_reset
+from web.shared.risk_controls import manual_reset_buy_lockout
 from web.shared.index_quotes import fetch_index_ltp_for_base
 from web.shared.symbol_helpers import suggest_option_symbol
 from web.shared.state_store import read_snapshot
@@ -322,6 +327,50 @@ def index_ltp(base_symbol: str):
         base_symbol=base,
         index_ltp=ltp,
         index_name=idx_name,
+    )
+
+
+@app.post("/api/risk/reset", dependencies=[Depends(require_api_key)], response_model=RiskResetResponse)
+def risk_reset():
+    result = manual_reset_buy_lockout()
+    if not result.get("ok"):
+        raise HTTPException(status_code=403, detail=result.get("message") or "Buy lockout reset refused")
+    return RiskResetResponse(
+        ok=True,
+        action=str(result.get("action") or "cleared"),
+        message=str(result.get("message") or "Buy lockout reset"),
+        timestamp=datetime.now().isoformat(),
+    )
+
+
+@app.post(
+    "/api/broker/session/reset",
+    dependencies=[Depends(require_api_key)],
+    response_model=BrokerSessionResetResponse,
+)
+def broker_session_reset():
+    reset_neo_client_cache()
+    requested_at = request_broker_session_reset()
+    api_relogin = "skipped"
+    relogin_msg = ""
+    try:
+        ensure_login()
+        api_relogin = "success"
+        relogin_msg = " API re-login succeeded."
+    except Exception as exc:
+        api_relogin = "failed"
+        relogin_msg = f" API re-login failed: {exc}"
+        logger.warning("Broker session reset: API relogin failed: %s", exc)
+
+    return BrokerSessionResetResponse(
+        ok=True,
+        worker_notified=True,
+        api_relogin=api_relogin,
+        message=(
+            f"Broker session cache cleared; worker notified at {requested_at}."
+            f"{relogin_msg} Worker will refresh on next poll."
+        ),
+        timestamp=datetime.now().isoformat(),
     )
 
 

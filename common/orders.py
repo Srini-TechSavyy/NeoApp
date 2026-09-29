@@ -12,6 +12,13 @@ def get_client():
     global _client
     return _client
 
+
+def reset_neo_client_cache() -> None:
+    """Drop cached NeoAPI client so the next ensure_login() performs fresh TOTP/MPIN."""
+    global _client
+    _client = None
+
+
 def ensure_login(log_cb=None, latency_meta: Optional[Dict[str, Any]] = None):
     global _client
     if _client is None:

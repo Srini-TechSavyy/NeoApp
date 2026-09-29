@@ -8,9 +8,9 @@ from datetime import datetime
 # Ensure project root import path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from common.orders import ensure_login
-import common.orders as orders_module
+from common.orders import ensure_login, reset_neo_client_cache
 from common.orders import detect_exchange_segment
+from web.shared.broker_session_reset import consume_broker_session_reset_request
 from common.scrip_master import find_token_for_trading_symbol, get_lot_size_from_scrip_master, load_scrip_master_csv
 from common.config import COOL_OFF_PERIOD
 from common.time_utils import market_time_to_epoch
@@ -45,13 +45,6 @@ AUTO_STRIKE_OFFSET = int(os.getenv("AUTO_STRIKE_OFFSET", "0"))
 
 def _now() -> str:
     return datetime.now().isoformat()
-
-
-def _reset_login_session():
-    try:
-        orders_module._client = None
-    except Exception:
-        pass
 
 
 def _is_session_error(exc: Exception) -> bool:
@@ -352,6 +345,13 @@ def main():
 
     while True:
         cycle_started = time.time()
+        if consume_broker_session_reset_request():
+            logger.info("Broker session reset requested; clearing cached client")
+            reset_neo_client_cache()
+            try:
+                client = ensure_login()
+            except Exception as relogin_exc:
+                logger.exception("Worker relogin after session reset failed: %s", relogin_exc)
         try:
             _run_once(client, manager, runtime_state)
             consecutive_failures = 0
@@ -362,7 +362,7 @@ def main():
             logger.exception("Worker cycle failed (count=%s)", consecutive_failures)
 
             if _is_session_error(exc):
-                _reset_login_session()
+                reset_neo_client_cache()
                 try:
                     client = ensure_login()
                 except Exception as relogin_exc:

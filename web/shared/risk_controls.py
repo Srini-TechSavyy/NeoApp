@@ -163,6 +163,53 @@ def evaluate_risk_state(completed_trades: List[Dict], last_exit_epoch: float = 0
     }
 
 
+def manual_reset_buy_lockout() -> Dict:
+    """Clear buy lockout timer; preserve memory fields (desktop RESET parity)."""
+    if not os.path.exists(BUY_DISABLED_FILE):
+        return {
+            "ok": True,
+            "action": "already_enabled",
+            "message": "Buy already enabled (no lockout file).",
+        }
+
+    try:
+        data = _load_state()
+        reason = data.get("last_trade_id")
+        rem = float(data.get("disabled_until", 0) or 0) - time.time()
+        if reason == "max_loss" or (
+            reason and str(reason).startswith("max_loss") and rem > 80000
+        ):
+            today = datetime.now().strftime("%Y-%m-%d")
+            if data.get("date") == today:
+                return {
+                    "ok": False,
+                    "error": "hard_stop",
+                    "message": "Max loss hard stop active for today; cannot override until tomorrow.",
+                }
+    except Exception:
+        pass
+
+    try:
+        data = _load_state()
+        data["disabled_until"] = 0
+        _save_state(data)
+        return {
+            "ok": True,
+            "action": "cleared",
+            "message": "Buy lockout timer cleared (memory preserved).",
+        }
+    except Exception:
+        try:
+            os.remove(BUY_DISABLED_FILE)
+        except Exception:
+            pass
+        return {
+            "ok": True,
+            "action": "cleared",
+            "message": "Buy lockout cleared.",
+        }
+
+
 def _reason_from_label(label) -> str:
     """Map buy_disabled.json last_trade_id to a stable reason code.
 
