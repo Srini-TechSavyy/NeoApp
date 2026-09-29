@@ -14,7 +14,8 @@ from web.shared.broker_session_reset import consume_broker_session_reset_request
 from common.scrip_master import find_token_for_trading_symbol, get_lot_size_from_scrip_master, load_scrip_master_csv
 from common.config import COOL_OFF_PERIOD
 from common.time_utils import market_time_to_epoch
-from indicator.scalping_indicator import LiveScalpingManager, RSIMomentumStrategy
+from indicator.scalping_indicator import LiveScalpingManager
+from indicator.three_candle_signal import ThreeCandleMinuteStrategy
 from monitor.pnl_engine import PositionPnLEngine, broker_trades_for_pnl
 from web.shared.monitor_snapshot import build_monitor_snapshot
 from web.shared.risk_controls import evaluate_risk_state
@@ -233,7 +234,8 @@ def _run_once(client, manager: LiveScalpingManager, runtime_state: dict):
     action_msg = ""
     # AUTO BUY
     if TRADING_ENABLED and AUTO_BUY_ENABLED and not open_pos and risk.get("buy_allowed"):
-        sig = str(indicator_data.get("signal", ""))
+        # One-shot entry events only — persistent signal must not re-trigger after exit.
+        sig = str(indicator_data.get("signal_event", "NONE"))
         if sig in ("BULLISH", "BEARISH") and idx_ltp > 0:
             try:
                 symbol = _suggest_symbol_for_signal(idx_name or AUTO_BASE_INDEX, idx_ltp, sig)
@@ -289,6 +291,10 @@ def _run_once(client, manager: LiveScalpingManager, runtime_state: dict):
     snapshot["message"] = "Worker cycle completed"
     snapshot["indicator"] = {
         "signal": indicator_data.get("signal"),
+        "signal_direction": indicator_data.get("signal_direction"),
+        "signal_event": indicator_data.get("signal_event"),
+        "last_confirmed_signal": indicator_data.get("last_confirmed_signal"),
+        "candle_streak": indicator_data.get("candle_streak"),
         "rsi": indicator_data.get("rsi"),
         "momentum": indicator_data.get("momentum"),
         "ema": indicator_data.get("ema"),
@@ -338,7 +344,7 @@ def _bootstrap_client():
 def main():
     logger.info("Starting web worker (poll=%ss)", POLL_SECONDS)
     client = _bootstrap_client()
-    manager = LiveScalpingManager(strategy=RSIMomentumStrategy())
+    manager = LiveScalpingManager(strategy=ThreeCandleMinuteStrategy())
     runtime_state = {"max_price_seen": 0.0, "seen_buy_ids": set()}
     consecutive_failures = 0
     last_success_at = None

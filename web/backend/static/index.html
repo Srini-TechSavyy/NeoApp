@@ -28,7 +28,7 @@
       --control-h: 28px;
     }
     *, *::before, *::after { box-sizing: border-box; }
-    html { -webkit-text-size-adjust: 100%; }
+    html { -webkit-text-size-adjust: 100%; background: var(--bg); }
     body {
       font-family: "Segoe UI", Inter, "Helvetica Neue", Arial, sans-serif;
       background: var(--bg);
@@ -37,6 +37,14 @@
       min-height: 100vh;
       font-size: 13px;
       line-height: 1.35;
+    }
+    html.signal-bullish,
+    body.signal-bullish {
+      background: #ecfdf5;
+    }
+    html.signal-bearish,
+    body.signal-bearish {
+      background: #fef2f2;
     }
     .top-bar {
       display: flex;
@@ -1164,6 +1172,20 @@
       syncExpiryFromSymbol();
     }
 
+    function applySignalBackground(indicator) {
+      const dir = (indicator && (indicator.signal_direction || indicator.signal)) || '';
+      const root = document.documentElement;
+      root.classList.remove('signal-bullish', 'signal-bearish');
+      document.body.classList.remove('signal-bullish', 'signal-bearish');
+      if (dir === 'BULLISH') {
+        root.classList.add('signal-bullish');
+        document.body.classList.add('signal-bullish');
+      } else if (dir === 'BEARISH') {
+        root.classList.add('signal-bearish');
+        document.body.classList.add('signal-bearish');
+      }
+    }
+
     function strategyFromIndicator(indicator) {
       if (!indicator) return { text: 'Strategy: —', color: '#6b7280' };
       const sig = indicator.signal || '';
@@ -1422,6 +1444,7 @@
       const stratEl = document.getElementById('strategyLabel');
       stratEl.textContent = strat.text;
       stratEl.style.color = strat.color;
+      applySignalBackground(indicator);
 
       const mom = Number(indicator.momentum);
       const momAlert = document.getElementById('momentumAlert');

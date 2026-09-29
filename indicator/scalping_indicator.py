@@ -320,6 +320,10 @@ class LiveScalpingManager:
                     'trend': pd.Series(dtype='str')
                 })
 
+        on_ltp = getattr(self.strategy, "on_ltp", None)
+        if on_ltp:
+            on_ltp(ltp, symbol)
+
         # 1. Temporarily add the row to calculate indicators
         new_row_df = pd.DataFrame([{
             'timestamp': now.isoformat(), 
@@ -332,7 +336,10 @@ class LiveScalpingManager:
         
         # 2. Calculate indicators for this new state
         try:
-            indicators = self.strategy.get_signal(temp_df)
+            try:
+                indicators = self.strategy.get_signal(temp_df, consume_event=False)
+            except TypeError:
+                indicators = self.strategy.get_signal(temp_df)
             # Add indicator results to our row
             update_data = {
                 'signal': indicators.get('signal'),
@@ -361,7 +368,10 @@ class LiveScalpingManager:
             
     def get_signal(self) -> dict:
         """Delegates calculation to the injected strategy."""
-        return self.strategy.get_signal(self.history)
+        try:
+            return self.strategy.get_signal(self.history, consume_event=True)
+        except TypeError:
+            return self.strategy.get_signal(self.history)
 
     def save_to_file(self):
         try:
