@@ -463,7 +463,7 @@
       font-size: 12px;
     }
     #buyStatusLabel { font-weight: 650; }
-    .status-bar .btn-reset-lockout {
+    .web-connect .btn-reset-lockout {
       height: var(--control-h);
       padding: 0 8px;
       font-size: 11px;
@@ -727,7 +727,6 @@
 
         <div class="status-bar">
           <span id="buyStatusLabel">Buy status: —</span>
-          <button type="button" id="resetBuyLockoutBtn" class="btn-reset-lockout" title="Clear buy lockout timer (same as desktop RESET)">Reset lockout</button>
           <span id="positionLabel" class="flat">● NO POSITION</span>
           <span id="momentumAlert"></span>
           <span id="strategyLabel">Strategy: —</span>
@@ -744,6 +743,7 @@
           <input id="token" type="password" placeholder="WEB_API_TOKEN (optional)" />
           <button type="button" id="connectBtn">Connect</button>
           <button type="button" id="resetBrokerSessionBtn" title="Clear cached Kotak Neo session; forces fresh broker login">Reset broker session</button>
+          <button type="button" id="resetBuyLockoutBtn" class="btn-reset-lockout" title="Clear buy lockout timer (same as desktop RESET)">Reset lockout</button>
           <span id="status" class="muted">Disconnected</span>
         </div>
         <div class="row ltp-row">
