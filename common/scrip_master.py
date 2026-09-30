@@ -1,7 +1,8 @@
 # scrip_master.py
 import os
+import re
 import pandas as pd
-from typing import Optional
+from typing import Optional, Tuple
 import time
 from datetime import datetime
 from .utils import log_with_callback
@@ -10,6 +11,9 @@ import requests
 
 _scrip_master_df: Optional[pd.DataFrame] = None
 _token_cache: dict = {}
+
+_MONTH_LETTER_TO_NUM = {"O": 10, "N": 11, "D": 12}
+_MONTH_NUM_TO_LETTER = {10: "O", 11: "N", 12: "D"}
 
 def _scrip_master_files():
     """Resolve paths at call time so tests can patch the path constants."""
@@ -126,6 +130,10 @@ def get_lot_size_from_scrip_master(trading_symbol: str, default=1) -> int:
         return default
     
     ts = trading_symbol.strip().upper()
+    # Prefer resolved broker symbol so lot size hits after expiry-format drift.
+    resolved = resolve_trading_symbol(ts)
+    if resolved:
+        ts = resolved
     df = _scrip_master_df
 
     tr_col = next((c for c in df.columns if "trd" in c and "symbol" in c), None)
@@ -142,23 +150,161 @@ def get_lot_size_from_scrip_master(trading_symbol: str, default=1) -> int:
     except:
         return default
 
+
+def _parse_option_symbol(symbol: str) -> Optional[Tuple[str, str, int, str]]:
+    """Parse option trading symbol into (base, expiry, strike, opt_type)."""
+    s = str(symbol).strip().upper()
+
+    m = re.search(r'^([A-Z]+?)([0-9]{6})(\d+)(CE|PE)$', s)
+    if m:
+        base, expiry, strike, opt_type = m.groups()
+        try:
+            mm = int(expiry[2:4])
+            dd = int(expiry[4:6])
+            if 1 <= mm <= 12 and 1 <= dd <= 31:
+                return base, expiry, int(strike), opt_type
+        except Exception:
+            pass
+
+    m = re.search(r'^([A-Z]+?)([0-9]{2}[A-Z]{3})(\d+)(CE|PE)$', s)
+    if m:
+        base, expiry, strike, opt_type = m.groups()
+        return base, expiry, int(strike), opt_type
+
+    m = re.search(r'^([A-Z]+?)([0-9]{2}[1-9OND][0-9]{2})(\d+)(CE|PE)$', s)
+    if m:
+        base, expiry, strike, opt_type = m.groups()
+        return base, expiry, int(strike), opt_type
+
+    m = re.search(r'^([A-Z]+?)([0-9]{5})(\d+)(CE|PE)$', s)
+    if m:
+        base, expiry, strike, opt_type = m.groups()
+        return base, expiry, int(strike), opt_type
+
+    return None
+
+
+def _normalize_weekly_expiry(expiry: str) -> str:
+    """Map legacy YYMMDD (e.g. 261001) to Kotak weekly code (26O01)."""
+    e = str(expiry).strip().upper()
+    if len(e) == 6 and e.isdigit():
+        yy, mm, dd = e[:2], int(e[2:4]), e[4:6]
+        if mm in _MONTH_NUM_TO_LETTER:
+            return f"{yy}{_MONTH_NUM_TO_LETTER[mm]}{dd}"
+    return e
+
+
+def _expiry_sort_key(expiry: str) -> tuple:
+    """Rough chronological key for weekly/monthly expiry codes."""
+    e = _normalize_weekly_expiry(expiry)
+    try:
+        if len(e) == 5 and e[2] in "123456789OND":
+            yy = 2000 + int(e[:2])
+            month_ch = e[2]
+            mm = _MONTH_LETTER_TO_NUM.get(month_ch, int(month_ch))
+            dd = int(e[3:5])
+            return (yy, mm, dd)
+        if len(e) == 5 and e[2:].isalpha():
+            # Monthly YYMMM — use mid-month as approximate
+            yy = 2000 + int(e[:2])
+            mm = datetime.strptime(e[2:], "%b").month
+            return (yy, mm, 28)
+    except Exception:
+        pass
+    return (9999, 12, 31)
+
+
+def _token_cache_keys():
+    if _token_cache:
+        return _token_cache.keys()
+    if _scrip_master_df is None:
+        return []
+    df = _scrip_master_df
+    tr_col = next((c for c in df.columns if "trd" in c and "symbol" in c), None)
+    if not tr_col:
+        return []
+    return df[tr_col].fillna("").astype(str).str.strip().str.upper().tolist()
+
+
+def _lookup_token_exact(ts: str) -> Optional[str]:
+    if _token_cache:
+        return _token_cache.get(ts)
+    if _scrip_master_df is None:
+        return None
+    df = _scrip_master_df
+    tr_col = next((c for c in df.columns if "trd" in c and "symbol" in c), None)
+    token_col = next((c for c in df.columns if "token" in c or "psymbol" in c), None)
+    if not tr_col or not token_col:
+        return None
+    matches = df[df[tr_col].astype(str).str.upper() == ts]
+    if matches.empty:
+        return None
+    return str(matches.iloc[0][token_col]).strip()
+
+
+def resolve_trading_symbol(trading_symbol: str, log_cb=None) -> Optional[str]:
+    """
+    Return the broker trading symbol from scrip master.
+    Exact match first; on miss, match by base + strike + CE/PE and prefer
+    the intended (or normalized) expiry code from today's scrip master.
+    """
+    ts = str(trading_symbol).strip().upper()
+    if not ts:
+        return None
+
+    if _lookup_token_exact(ts) is not None:
+        return ts
+
+    parts = _parse_option_symbol(ts)
+    if not parts:
+        return None
+
+    base, expiry, strike, opt_type = parts
+    suffix = f"{strike}{opt_type}"
+    intended = _normalize_weekly_expiry(expiry)
+
+    candidates = []
+    for key in _token_cache_keys():
+        if not key.startswith(base) or not key.endswith(suffix):
+            continue
+        cand_parts = _parse_option_symbol(key)
+        if not cand_parts:
+            continue
+        c_base, c_expiry, c_strike, c_opt = cand_parts
+        if c_base != base or c_strike != strike or c_opt != opt_type:
+            continue
+        candidates.append((key, c_expiry))
+
+    if not candidates:
+        return None
+
+    for key, c_expiry in candidates:
+        if c_expiry == expiry or _normalize_weekly_expiry(c_expiry) == intended:
+            if key != ts:
+                log_with_callback(log_cb, f"Resolved trading symbol {ts} -> {key}")
+            return key
+
+    # Prefer nearest future expiry; fall back to lexicographically first.
+    today_key = (datetime.now().year, datetime.now().month, datetime.now().day)
+
+    def rank(item):
+        key, c_expiry = item
+        ek = _expiry_sort_key(c_expiry)
+        future_penalty = 0 if ek >= today_key else 1
+        return (future_penalty, ek, key)
+
+    best = sorted(candidates, key=rank)[0][0]
+    log_with_callback(log_cb, f"Resolved trading symbol {ts} -> {best} (nearest expiry match)")
+    return best
+
+
 def find_token_for_trading_symbol(trading_symbol: str, log_cb=None) -> Optional[str]:
     """
-    Finds server-side token for the exact trading symbol using optimized cache.
+    Finds server-side token for the trading symbol using optimized cache.
+    Falls back to scrip-master resolution when the constructed symbol drifts
+    from the broker's expiry encoding (e.g. 261001 vs 26O01).
     """
-    if not _token_cache:
-        # Fallback to slow search if cache not populated
-        if _scrip_master_df is None: return None
-        
-        ts = str(trading_symbol).strip().upper()
-        df = _scrip_master_df
-        tr_col = next((c for c in df.columns if "trd" in c and "symbol" in c), None)
-        token_col = next((c for c in df.columns if "token" in c or "psymbol" in c), None)
-        if tr_col and token_col:
-            matches = df[df[tr_col].astype(str).str.upper() == ts]
-            if not matches.empty:
-                return str(matches.iloc[0][token_col]).strip()
+    resolved = resolve_trading_symbol(trading_symbol, log_cb=log_cb)
+    if not resolved:
         return None
-    
-    ts = str(trading_symbol).strip().upper()
-    return _token_cache.get(ts)
+    return _lookup_token_exact(resolved)

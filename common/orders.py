@@ -3,7 +3,7 @@ import time
 from typing import Any, Dict, Optional
 from .utils import log_with_callback
 from .config import LOT_SIZE
-from .scrip_master import get_lot_size_from_scrip_master
+from .scrip_master import get_lot_size_from_scrip_master, resolve_trading_symbol
 from .neo_login import get_neo_client
 
 _client = None
@@ -55,7 +55,8 @@ def detect_strike_step(trading_symbol: str) -> int:
 
 def place_market_order(token, lots, side, trading_symbol, log_cb=None, latency_meta: Optional[Dict[str, Any]] = None):
     client = ensure_login(log_cb, latency_meta=latency_meta)
-    
+
+    trading_symbol = resolve_trading_symbol(trading_symbol, log_cb=log_cb) or str(trading_symbol).strip().upper()
     exchange_segment = detect_exchange_segment(trading_symbol)
     lot_size = get_lot_size_from_scrip_master(trading_symbol, default=1)
     

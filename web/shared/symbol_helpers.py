@@ -34,7 +34,14 @@ def parse_symbol_parts(symbol: str):
         except Exception:
             pass
 
+    # Monthly: YYMMM (e.g. 26SEP)
     m = re.search(r'^([A-Z]+?)([0-9]{2}[A-Z]{3})(\d+)(CE|PE)$', s)
+    if m:
+        base, expiry, strike, opt_type = m.groups()
+        return base, expiry, int(strike), opt_type
+
+    # Weekly: YY + month code [1-9OND] + DD (e.g. 26917, 26O01)
+    m = re.search(r'^([A-Z]+?)([0-9]{2}[1-9OND][0-9]{2})(\d+)(CE|PE)$', s)
     if m:
         base, expiry, strike, opt_type = m.groups()
         return base, expiry, int(strike), opt_type

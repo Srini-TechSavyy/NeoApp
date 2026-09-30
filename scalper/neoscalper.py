@@ -349,7 +349,7 @@ def get_underlying_index(symbol: str):
 def parse_symbol_parts(symbol: str):
     """
     Robustly parses a symbol like NIFTY2621725600CE into parts.
-    Handles variable length expiry (5 or 6 digits) correctly.
+    Handles variable length expiry (5 or 6 digits) and letter-month weeklies (26O01).
     Returns: (base, expiry, strike, opt_type) or None
     """
     s = symbol.strip().upper()
@@ -370,6 +370,12 @@ def parse_symbol_parts(symbol: str):
     # Try 5-character match (2 digits + 3 letters for Monthly) 
     # Example: NIFTY26FEB... -> 26 (Year) + FEB (Month)
     m = re.search(r'^([A-Z]+?)([0-9]{2}[A-Z]{3})(\d+)(CE|PE)$', s)
+    if m:
+        base, expiry, strike, opt_type = m.groups()
+        return base, expiry, int(strike), opt_type
+
+    # Weekly: YY + month code [1-9OND] + DD (e.g. 26917, 26O01)
+    m = re.search(r'^([A-Z]+?)([0-9]{2}[1-9OND][0-9]{2})(\d+)(CE|PE)$', s)
     if m:
         base, expiry, strike, opt_type = m.groups()
         return base, expiry, int(strike), opt_type

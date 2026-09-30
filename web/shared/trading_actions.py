@@ -4,7 +4,12 @@ import time
 from typing import Dict, List, Optional, Tuple
 
 from common.orders import detect_exchange_segment, ensure_login, place_market_order
-from common.scrip_master import find_token_for_trading_symbol, get_lot_size_from_scrip_master, load_scrip_master_csv
+from common.scrip_master import (
+    find_token_for_trading_symbol,
+    get_lot_size_from_scrip_master,
+    load_scrip_master_csv,
+    resolve_trading_symbol,
+)
 from web.shared.order_status import lookup_order_status
 from web.shared.trade_latency import TradeLatencyRecorder
 
@@ -164,9 +169,14 @@ def execute_market_action(
         latency.mark("after_neo_login")
 
     symbol = trading_symbol.strip().upper()
+    resolved = resolve_trading_symbol(symbol)
+    if resolved:
+        symbol = resolved
     token = find_token_for_trading_symbol(symbol)
     if not token:
         load_scrip_master_csv()
+        resolved = resolve_trading_symbol(symbol) or symbol
+        symbol = resolved
         token = find_token_for_trading_symbol(symbol)
     if latency:
         latency.mark("after_symbol_lookup")

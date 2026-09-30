@@ -20,17 +20,26 @@ DEFAULT_TRADING_SYMBOL = "NIFTY"
 
 from datetime import datetime, timedelta
 
+# Kotak weekly month codes: Jan–Sep digits, Oct/Nov/Dec letters.
+_WEEKLY_MONTH_CODES = {
+    1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6",
+    7: "7", 8: "8", 9: "9", 10: "O", 11: "N", 12: "D",
+}
+
+
 def _format_neo_expiry(expiry: datetime) -> str:
     """
     Kotak trading symbols:
     - Monthly expiry (last expiry weekday of the month): YYMMM, e.g. 26SEP.
       The weekly code does not exist for that date.
-    - Other weeklies: YYMDD with month not zero-padded, e.g. 26917 for 2026-09-17.
+    - Other weeklies: YY + month code + DD, e.g. 26917 for 2026-09-17,
+      26O01 for 2026-10-01 (O/N/D for Oct/Nov/Dec).
     """
     next_week = expiry + timedelta(days=7)
     if next_week.month != expiry.month:
         return expiry.strftime("%y%b").upper()
-    return f"{expiry:%y}{expiry.month}{expiry:%d}"
+    month_code = _WEEKLY_MONTH_CODES[expiry.month]
+    return f"{expiry:%y}{month_code}{expiry:%d}"
 
 
 def get_next_expiry(symbol: str) -> str:
