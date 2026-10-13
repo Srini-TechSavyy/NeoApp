@@ -11,6 +11,7 @@ from common.config import (
     MAX_DAILY_LOSS_COUNT,
     PROGRESSIVE_LOSS_CONFIG,
 )
+from web.shared.kill_switch import get_kill_switch_status
 
 BUY_DISABLED_FILE = os.getenv("BUY_DISABLED_FILE", "buy_disabled.json")
 
@@ -151,8 +152,21 @@ def evaluate_risk_state(completed_trades: List[Dict], last_exit_epoch: float = 0
     if not locked and cooloff_remaining > 0 and not reason:
         reason = "cooloff"
 
+    ks = get_kill_switch_status(purge_expired=True)
+    ks_active = bool(ks.get("active"))
+    ks_expires = float(ks.get("expires_at", 0) or 0)
+    ks_expires_ist = str(ks.get("expires_at_ist") or "")
+
+    if ks_active:
+        locked = True
+        disabled_until = max(disabled_until, ks_expires)
+        if not reason or reason == "cooloff":
+            reason = "kill_switch"
+
+    buy_allowed = (not locked) and cooloff_remaining == 0
+
     return {
-        "buy_allowed": (not locked) and cooloff_remaining == 0,
+        "buy_allowed": buy_allowed,
         "locked": locked,
         "reason": reason,
         "disabled_until": disabled_until,
@@ -160,6 +174,9 @@ def evaluate_risk_state(completed_trades: List[Dict], last_exit_epoch: float = 0
         "weekly_net_pnl": round(net_pnl, 2),
         "highest_threshold": highest_threshold,
         "weekly_trades": len(weekly),
+        "kill_switch_active": ks_active,
+        "kill_switch_expires_at": ks_expires if ks_active else 0.0,
+        "kill_switch_expires_at_ist": ks_expires_ist,
     }
 
 

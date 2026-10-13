@@ -704,6 +704,13 @@
 
       <details class="web-connect">
         <summary>Web connection (snapshot &amp; orders)</summary>
+        <div class="row kill-switch-row">
+          <label class="kill-switch-label" for="killSwitchToggle">
+            <input type="checkbox" id="killSwitchToggle" />
+            Daily Kill Switch
+          </label>
+          <span id="killSwitchStatus" class="muted">Inactive</span>
+        </div>
         <div class="row">
           <label for="token">API Token</label>
           <input id="token" type="password" placeholder="WEB_API_TOKEN (optional)" />
@@ -718,7 +725,7 @@
           <span class="muted ltp-hint">Fetched from broker for Suggest; editable override</span>
         </div>
         <div class="muted connect-endpoints">
-          <code>/api/index/ltp</code> · <code>/api/monitor/snapshot</code> · <code>/ws/monitor</code> · <code>/api/trade/action</code> · <code>/api/risk/reset</code> · <code>/api/broker/session/reset</code>
+          <code>/api/kill-switch</code> · <code>/api/index/ltp</code> · <code>/api/monitor/snapshot</code> · <code>/ws/monitor</code> · <code>/api/trade/action</code> · <code>/api/risk/reset</code> · <code>/api/broker/session/reset</code>
         </div>
         <div id="message" class="muted">Click Connect to stream live worker data (no mock quotes).</div>
         <div id="suggestedSymbol" class="muted"></div>
@@ -735,6 +742,8 @@
     let lastLogAction = '';
     let systemTradingEnabled = null;
     let lastRisk = null;
+    let killSwitchState = { active: false, expires_at_ist: '' };
+    let killSwitchActivating = false;
 
     const tokenEl = document.getElementById('token');
     const tradeSymbolEl = document.getElementById('tradeSymbol');
@@ -1016,10 +1025,107 @@
       document.getElementById('message').className = cls;
     }
 
+    function syncTradeButtons(busy = tradeInFlight) {
+      const killBlock = !!(killSwitchState && killSwitchState.active);
+      const riskBlock = !!(lastRisk && lastRisk.buy_allowed === false);
+      const tradingBlock = systemTradingEnabled === false;
+      const blockBuy = killBlock || riskBlock || tradingBlock;
+      if (buyBtn) buyBtn.disabled = !!busy || blockBuy;
+      if (exitBtn) exitBtn.disabled = !!busy;
+    }
+
     function setTradeBusy(busy, text = 'Working...') {
-      if (buyBtn) buyBtn.disabled = busy;
-      if (exitBtn) exitBtn.disabled = busy;
       if (tradeStatusEl) tradeStatusEl.textContent = busy ? text : 'Idle';
+      syncTradeButtons(busy);
+    }
+
+    function updateKillSwitchUi() {
+      const toggle = document.getElementById('killSwitchToggle');
+      const statusEl = document.getElementById('killSwitchStatus');
+      if (!toggle || !statusEl) return;
+      const active = !!(killSwitchState && killSwitchState.active);
+      toggle.checked = active;
+      toggle.disabled = active || killSwitchActivating;
+      if (active) {
+        const until = killSwitchState.expires_at_ist || 'midnight IST';
+        statusEl.textContent = `Active — BUY disabled until ${until}`;
+        statusEl.className = 'red';
+      } else {
+        statusEl.textContent = 'Inactive';
+        statusEl.className = 'muted';
+      }
+    }
+
+    function applyKillSwitchPayload(payload) {
+      if (!payload || typeof payload !== 'object') return;
+      killSwitchState = {
+        active: payload.active === true,
+        expires_at_ist: String(payload.expires_at_ist || ''),
+      };
+      updateKillSwitchUi();
+      syncTradeButtons();
+    }
+
+    function syncKillSwitchFromRisk(risk) {
+      if (!risk || typeof risk !== 'object') return;
+      if (risk.kill_switch_active === true) {
+        killSwitchState = {
+          active: true,
+          expires_at_ist: String(risk.kill_switch_expires_at_ist || killSwitchState.expires_at_ist || ''),
+        };
+        updateKillSwitchUi();
+        syncTradeButtons();
+      } else if (!killSwitchActivating && !killSwitchState.active) {
+        killSwitchState = { active: false, expires_at_ist: '' };
+        updateKillSwitchUi();
+        syncTradeButtons();
+      }
+    }
+
+    async function loadKillSwitch(token) {
+      try {
+        const r = await fetch('/api/kill-switch', { headers: token ? { 'X-API-Key': token } : {} });
+        if (!r.ok) return;
+        const j = await r.json();
+        applyKillSwitchPayload(j);
+      } catch (_) {}
+    }
+
+    async function activateKillSwitch() {
+      const toggle = document.getElementById('killSwitchToggle');
+      if (killSwitchState.active || killSwitchActivating) {
+        if (toggle) toggle.checked = killSwitchState.active;
+        return;
+      }
+      const ok = window.confirm(
+        'Activate Daily Kill Switch? BUY will be disabled until midnight IST and cannot be turned off early.'
+      );
+      if (!ok) {
+        if (toggle) toggle.checked = false;
+        return;
+      }
+      const token = tokenEl.value.trim();
+      killSwitchActivating = true;
+      updateKillSwitchUi();
+      try {
+        const r = await fetch('/api/kill-switch/activate', { method: 'POST', headers: _headers(token) });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const d = j?.detail || `Kill switch activation failed (${r.status})`;
+          setMessage(String(d), 'red');
+          if (toggle) toggle.checked = false;
+          return;
+        }
+        applyKillSwitchPayload(j);
+        setMessage(j.message || 'Daily kill switch activated.', 'red');
+      } catch (e) {
+        setMessage(String(e?.message || e), 'red');
+        if (toggle) toggle.checked = false;
+      } finally {
+        killSwitchActivating = false;
+        updateKillSwitchUi();
+        syncTradeButtons();
+      }
     }
 
     function setTradeResult(msg, cls = 'muted') {
@@ -1295,6 +1401,8 @@
         label = 'Max Daily Losses';
       } else if (raw === 'cooloff') {
         label = 'Cool-off';
+      } else if (raw === 'kill_switch') {
+        label = 'Kill Switch';
       } else if (/^max_loss_\d+$/.test(raw)) {
         const amount = raw.replace('max_loss_', '');
         label = `Loss Limit (${amount})`;
@@ -1325,6 +1433,7 @@
         el.textContent = 'Buy status: —';
         el.className = 'muted';
       }
+      syncTradeButtons();
     }
 
     function render(payload) {
@@ -1383,6 +1492,7 @@
       }
 
       lastRisk = risk;
+      syncKillSwitchFromRisk(risk);
       renderRisk(risk, systemTradingEnabled);
 
       const posEl = document.getElementById('positionLabel');
@@ -1790,6 +1900,7 @@
       try {
         await loadSnapshot(token);
         await loadSystemStatus(token);
+        await loadKillSwitch(token);
         await fetchIndexLtpForSelectedIndex({ suggestAfter: true });
         connectWs(token);
       } catch (e) {
@@ -1798,6 +1909,14 @@
         setConnStatus(false);
       }
     });
+
+    const killSwitchToggle = document.getElementById('killSwitchToggle');
+    if (killSwitchToggle) {
+      killSwitchToggle.addEventListener('change', () => {
+        if (killSwitchToggle.checked) activateKillSwitch();
+        else killSwitchToggle.checked = killSwitchState.active;
+      });
+    }
 
     bindClick(document.getElementById('resetBuyLockoutBtn'), () => { resetBuyLockout(); });
     bindClick(document.getElementById('resetBrokerSessionBtn'), () => { resetBrokerSession(); });
@@ -1854,6 +1973,11 @@
       saved = '';
     }
     tokenEl.value = saved;
+    if (saved) {
+      loadKillSwitch(saved);
+    } else {
+      updateKillSwitchUi();
+    }
     initBaseIndexFromStorage();
     updateSummaryLtpLabel(getSelectedBaseIndex());
     syncOptionTypeButtons();

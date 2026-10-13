@@ -117,3 +117,22 @@ class BrokerSessionResetResponse(BaseModel):
     api_relogin: Literal["success", "failed", "skipped"]
     message: str
     timestamp: str
+
+
+class KillSwitchStatusResponse(BaseModel):
+    ok: bool
+    active: bool
+    expires_at: float = 0.0
+    expires_at_ist: str = ""
+    activated_at: float = 0.0
+    timestamp: str
+
+
+class KillSwitchActivateResponse(BaseModel):
+    ok: bool
+    active: bool
+    expires_at: float = 0.0
+    expires_at_ist: str = ""
+    activated_at: float = 0.0
+    message: str
+    timestamp: str

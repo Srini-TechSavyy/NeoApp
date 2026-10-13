@@ -29,6 +29,8 @@ from web.backend.models import (
     BrokerSessionResetResponse,
     HealthResponse,
     IndexLtpResponse,
+    KillSwitchActivateResponse,
+    KillSwitchStatusResponse,
     MonitorSnapshotData,
     MonitorSnapshotResponse,
     RiskResetResponse,
@@ -40,6 +42,7 @@ from web.backend.models import (
 )
 from common.orders import ensure_login, reset_neo_client_cache
 from web.shared.broker_session_reset import request_broker_session_reset
+from web.shared.kill_switch import activate_kill_switch, get_kill_switch_status, is_buy_blocked_by_kill_switch
 from web.shared.risk_controls import manual_reset_buy_lockout
 from web.shared.index_quotes import fetch_index_ltp_for_base
 from web.shared.symbol_helpers import suggest_option_symbol
@@ -224,6 +227,15 @@ def trade_action(payload: TradeActionRequest, request: Request):
     if latency:
         latency.mark("after_trading_enabled_check")
 
+    if payload.action == "BUY":
+        ks = is_buy_blocked_by_kill_switch()
+        if ks.get("active"):
+            until = str(ks.get("expires_at_ist") or "midnight IST")
+            raise HTTPException(
+                status_code=429,
+                detail=f"Buy blocked: kill switch active until {until}",
+            )
+
     snapshot = read_snapshot()
     risk = snapshot.get("risk", {}) if isinstance(snapshot, dict) else {}
     if latency:
@@ -327,6 +339,38 @@ def index_ltp(base_symbol: str):
         base_symbol=base,
         index_ltp=ltp,
         index_name=idx_name,
+    )
+
+
+@app.get("/api/kill-switch", dependencies=[Depends(require_api_key)], response_model=KillSwitchStatusResponse)
+def kill_switch_status():
+    status = get_kill_switch_status(purge_expired=True)
+    return KillSwitchStatusResponse(
+        ok=True,
+        active=bool(status.get("active")),
+        expires_at=float(status.get("expires_at", 0) or 0),
+        expires_at_ist=str(status.get("expires_at_ist") or ""),
+        activated_at=float(status.get("activated_at", 0) or 0),
+        timestamp=datetime.now().isoformat(),
+    )
+
+
+@app.post(
+    "/api/kill-switch/activate",
+    dependencies=[Depends(require_api_key)],
+    response_model=KillSwitchActivateResponse,
+)
+def kill_switch_activate():
+    status = activate_kill_switch()
+    until = str(status.get("expires_at_ist") or "midnight IST")
+    return KillSwitchActivateResponse(
+        ok=True,
+        active=bool(status.get("active")),
+        expires_at=float(status.get("expires_at", 0) or 0),
+        expires_at_ist=until,
+        activated_at=float(status.get("activated_at", 0) or 0),
+        message=f"Daily kill switch active until {until}",
+        timestamp=datetime.now().isoformat(),
     )
 
 

@@ -6,6 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     WEB_STATE_FILE=logs/web_monitor_state.json \
     WEB_STATE_LOCK_FILE=logs/web_monitor_state.lock \
     BUY_DISABLED_FILE=buy_disabled.json \
+    KILL_SWITCH_FILE=kill_switch.json \
     WEB_LOG_LEVEL=INFO \
     WEB_ALLOW_LOCAL_NOAUTH=false \
     TRADING_ENABLED=false
