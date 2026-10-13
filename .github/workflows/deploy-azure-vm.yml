@@ -84,11 +84,14 @@ jobs:
             --exclude='*.log' \
             --exclude='logs/' \
             --exclude='buy_disabled.json' \
+            --exclude='kill_switch.json' \
             --exclude='node_modules/' \
             ./ "$RELEASE_DIR/"
 
           rm -rf "$RELEASE_DIR/logs"
           ln -sfn "$APP_DIR/shared/logs" "$RELEASE_DIR/logs"
+          ln -sfn "$APP_DIR/shared/data/kill_switch.json" "$RELEASE_DIR/kill_switch.json"
+          ln -sfn "$APP_DIR/shared/data/buy_disabled.json" "$RELEASE_DIR/buy_disabled.json"
 
       - name: Verify environment
         shell: bash
@@ -138,9 +141,39 @@ jobs:
 
           ln -sfn "$RELEASE_DIR" "$APP_DIR/current"
           ln -sfn "$APP_DIR/shared/logs" "$APP_DIR/current/logs"
+          ln -sfn "$APP_DIR/shared/data/kill_switch.json" "$APP_DIR/current/kill_switch.json"
+          ln -sfn "$APP_DIR/shared/data/buy_disabled.json" "$APP_DIR/current/buy_disabled.json"
 
           echo "Current release:"
           readlink -f "$APP_DIR/current"
+
+      - name: Validate risk control paths
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          NEOAPP_ENV="/etc/neoapp2/neoapp.env"
+          APP_DIR="/opt/neoapp2"
+
+          check_risk_path() {
+            local key="$1"
+            local line val
+            line="$(grep -E "^${key}=" "$NEOAPP_ENV" || true)"
+            if [[ -z "$line" ]]; then
+              echo "::warning::${key} not set in neoapp.env (release symlinks still point at shared/data defaults)"
+              return 0
+            fi
+            val="${line#*=}"
+            val="${val%$'\r'}"
+            if [[ "$val" == *"/releases/"* ]] || [[ "$val" == "$APP_DIR/current" ]] || [[ "$val" == "$APP_DIR/current/"* ]]; then
+              echo "::error::${key}=${val} points at a release/current path (not writable by neoapp). Use ${APP_DIR}/shared/data/... See deploy/AZURE_DEPLOY.md"
+              exit 1
+            fi
+          }
+
+          check_risk_path KILL_SWITCH_FILE
+          check_risk_path BUY_DISABLED_FILE
+          echo "Risk control path validation: OK"
 
       - name: Restart services
         shell: bash
@@ -172,6 +205,8 @@ jobs:
             echo "Rolling back to: $PREVIOUS_RELEASE"
             ln -sfn "$PREVIOUS_RELEASE" "$APP_DIR/current"
             ln -sfn "$APP_DIR/shared/logs" "$APP_DIR/current/logs"
+            ln -sfn "$APP_DIR/shared/data/kill_switch.json" "$APP_DIR/current/kill_switch.json"
+            ln -sfn "$APP_DIR/shared/data/buy_disabled.json" "$APP_DIR/current/buy_disabled.json"
             sudo -n /usr/bin/systemctl restart neo-worker.service
             sudo -n /usr/bin/systemctl restart neo-fastapi.service
           }

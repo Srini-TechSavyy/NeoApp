@@ -78,15 +78,20 @@ sudo chown neoapp:neoapp /opt/neoapp2/shared/assets/*.csv
 
 See also [docs/VM_SECRET_UPDATE.md](../docs/VM_SECRET_UPDATE.md).
 
-**Existing VMs (kill switch):** If `neoapp.env` was created before `KILL_SWITCH_FILE` was added to [deploy/env.example](env.example), add the shared path and restart FastAPI:
+**Existing VMs (risk control files):** If `neoapp.env` was created before shared paths were added to [deploy/env.example](env.example), add them and restart services:
 
 ```bash
 grep -q '^KILL_SWITCH_FILE=' /etc/neoapp2/neoapp.env || \
   echo 'KILL_SWITCH_FILE=/opt/neoapp2/shared/data/kill_switch.json' | sudo tee -a /etc/neoapp2/neoapp.env
+grep -q '^BUY_DISABLED_FILE=' /etc/neoapp2/neoapp.env || \
+  echo 'BUY_DISABLED_FILE=/opt/neoapp2/shared/data/buy_disabled.json' | sudo tee -a /etc/neoapp2/neoapp.env
 sudo mkdir -p /opt/neoapp2/shared/data
 sudo chown neoapp:neoapp /opt/neoapp2/shared/data
-sudo systemctl restart neo-fastapi.service
+sudo systemctl restart neo-fastapi.service neo-worker.service
+sudo -u neoapp test -w /opt/neoapp2/shared/data && echo "shared/data writable by neoapp"
 ```
+
+Each deploy also symlinks `kill_switch.json` and `buy_disabled.json` in the active release to `shared/data/` (same idea as `logs/`). Prefer explicit `/opt/neoapp2/shared/data/…` values in `neoapp.env` as in [deploy/env.example](env.example).
 
 ### Enable live trading (manual, after validation)
 
@@ -289,6 +294,8 @@ ls -la /opt/neoapp2/shared/logs/web_monitor_state.json
 PREV=/opt/neoapp2/releases/<previous-release-id>
 sudo ln -sfn "$PREV" /opt/neoapp2/current
 sudo ln -sfn /opt/neoapp2/shared/logs /opt/neoapp2/current/logs
+sudo ln -sfn /opt/neoapp2/shared/data/kill_switch.json /opt/neoapp2/current/kill_switch.json
+sudo ln -sfn /opt/neoapp2/shared/data/buy_disabled.json /opt/neoapp2/current/buy_disabled.json
 sudo systemctl restart neo-worker.service neo-fastapi.service
 curl -fsS http://127.0.0.1:8000/health
 ```
@@ -301,7 +308,7 @@ curl -fsS http://127.0.0.1:8000/health
 |--------|----------------|
 | Health check fails after deploy | Check `journalctl -u neo-fastapi`; rollback may have run |
 | 503 on API routes | `WEB_API_TOKEN` empty and `WEB_ALLOW_LOCAL_NOAUTH=false` |
-| 500 or 503 on `POST /api/kill-switch/activate` | `KILL_SWITCH_FILE` missing or pointing at `/opt/neoapp2/current/` (release dir not writable by `neoapp`). Set `KILL_SWITCH_FILE=/opt/neoapp2/shared/data/kill_switch.json` in `neoapp.env`, restart `neo-fastapi`. Confirm with `journalctl -u neo-fastapi -n 50` (`PermissionError` on `current/kill_switch.json` is the usual signature). |
+| 500 or 503 on `POST /api/kill-switch/activate` | `KILL_SWITCH_FILE` missing or pointing at `/opt/neoapp2/current/` or a `releases/…` path (not writable by `neoapp`). Set `KILL_SWITCH_FILE=/opt/neoapp2/shared/data/kill_switch.json` in `neoapp.env` (see **Existing VMs** above), restart `neo-fastapi`. After a deploy, `readlink -f /opt/neoapp2/current/kill_switch.json` should resolve under `shared/data/`. Confirm with `journalctl -u neo-fastapi -n 50` (`PermissionError` on `releases/…/kill_switch.json` is the usual signature). |
 | Worker stale / empty snapshot | Neo login failure; check credentials in `neoapp.env` and worker logs |
 | Symbol not found | Missing or outdated CSV in `shared/assets/` |
 | pip install fails on deploy | Install `git` and `build-essential`; network to GitHub for Neo API package |
