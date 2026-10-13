@@ -327,49 +327,6 @@
       gap: 8px;
       width: 100%;
     }
-    .auto-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      width: 100%;
-    }
-    .auto-card {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      min-height: 34px;
-      padding: 6px 10px;
-      border-radius: 6px;
-      border: 1px solid var(--amber-border);
-      background: var(--amber-bg);
-      font-size: 11px;
-      font-weight: 650;
-      color: var(--amber);
-    }
-    .auto-card.on {
-      background: #fff7ed;
-      border-color: #fdba74;
-    }
-    .auto-dot {
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      border: 2px solid #cbd5e1;
-      background: #fff;
-      flex-shrink: 0;
-    }
-    .auto-card.on .auto-dot {
-      border-color: #86efac;
-      background: #ecfdf3;
-      box-shadow: inset 0 0 0 3px #fff;
-    }
-    .auto-name { flex: 1; min-width: 0; }
-    .auto-state {
-      font-weight: 800;
-      letter-spacing: 0.04em;
-      font-size: 10px;
-    }
-    .auto-card.on .auto-state { color: #166534; }
 
     .symbol-field-wrap {
       display: flex;
@@ -394,7 +351,20 @@
       box-shadow: none;
     }
     .symbol-field-wrap #tradeSymbol:focus { box-shadow: none; }
-    #suggestBtn {
+    #symbolAlignLtp {
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      min-width: 52px;
+      border-left: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--navy);
+      background: #fafbfc;
+      white-space: nowrap;
+    }
+    .symbol-field-wrap .symbol-icon-btn {
       width: 34px;
       min-width: 34px;
       padding: 0;
@@ -405,7 +375,7 @@
       color: var(--muted);
       font-size: 14px;
     }
-    #suggestBtn:hover:not(:disabled) { background: #eef2f7; color: var(--navy); }
+    .symbol-field-wrap .symbol-icon-btn:hover:not(:disabled) { background: #eef2f7; color: var(--navy); }
 
     .lots-stepper {
       display: inline-flex;
@@ -608,7 +578,6 @@
         height: 52px;
         font-size: 16px;
       }
-      .auto-row { grid-template-columns: 1fr; }
       .status-bar {
         flex-direction: column;
         align-items: flex-start;
@@ -622,7 +591,6 @@
 
     @media (max-width: 360px) {
       .pnl-val { font-size: 13px; }
-      .auto-card { padding: 5px 8px; font-size: 10px; }
     }
   </style>
 </head>
@@ -701,7 +669,9 @@
               <input id="tradeSymbol" type="text" placeholder="NIFTY26AUG25000CE" autocomplete="off" spellcheck="false" />
               <input id="indexLtp" type="hidden" />
               <input id="optionType" type="hidden" value="CE" />
-              <button type="button" id="suggestBtn" title="Suggest symbol" aria-label="Suggest symbol">🔍</button>
+              <span id="symbolAlignLtp" class="muted" title="Index LTP used to align symbol">—</span>
+              <button type="button" id="symbolRefreshBtn" class="symbol-icon-btn" title="Refresh index LTP from broker and align symbol" aria-label="Refresh index LTP and align symbol">↻</button>
+              <button type="button" id="suggestBtn" class="symbol-icon-btn" title="Suggest symbol" aria-label="Suggest symbol">🔍</button>
             </div>
           </div>
           <div class="strip-cell">
@@ -718,18 +688,6 @@
           <div class="action-btns">
             <button type="button" id="buyBtn" class="btn-buy"><span class="btn-action-icon" aria-hidden="true">▲</span> BUY</button>
             <button type="button" id="exitBtn" class="btn-exit"><span class="btn-action-icon" aria-hidden="true">▼</span> EXIT</button>
-          </div>
-          <div class="auto-row">
-            <div id="autoBuyBadge" class="auto-card" aria-live="polite">
-              <span class="auto-dot" aria-hidden="true"></span>
-              <span class="auto-name">Auto Buy</span>
-              <span class="auto-state">—</span>
-            </div>
-            <div id="autoSellBadge" class="auto-card" aria-live="polite">
-              <span class="auto-dot" aria-hidden="true"></span>
-              <span class="auto-name">Auto Sell</span>
-              <span class="auto-state">—</span>
-            </div>
           </div>
         </div>
 
@@ -941,6 +899,7 @@
           return false;
         }
         applyIndexLtpFields(j.index_ltp);
+        setSymbolAlignLtpDisplay(j.index_ltp);
         const idxLive = document.getElementById('indexLtpLive');
         const name = j.index_name ? j.index_name.trim() : base_symbol;
         const ltpText = `${name} LTP ${Number(j.index_ltp).toFixed(2)}`;
@@ -961,6 +920,31 @@
     async function ensureIndexLtpFromBroker() {
       if (getIndexLtpValue() > 0) return true;
       return await fetchIndexLtpForSelectedIndex({ suggestAfter: false });
+    }
+
+    function setSymbolAlignLtpDisplay(ltp) {
+      const alignEl = document.getElementById('symbolAlignLtp');
+      if (!alignEl) return;
+      const n = Number(ltp);
+      alignEl.textContent = Number.isFinite(n) && n > 0 ? formatLtpValue(n) : '—';
+    }
+
+    async function refreshSymbolFromBrokerLtp() {
+      const btn = document.getElementById('symbolRefreshBtn');
+      const suggestedEl = document.getElementById('suggestedSymbol');
+      if (btn?.disabled) return;
+      if (btn) btn.disabled = true;
+      try {
+        const ok = await fetchIndexLtpForSelectedIndex({ suggestAfter: true });
+        if (ok) {
+          setSymbolAlignLtpDisplay(getIndexLtpValue());
+        } else if (suggestedEl && !suggestedEl.textContent) {
+          suggestedEl.textContent = 'Refresh: connect and check API token, or enter index LTP manually';
+          suggestedEl.className = 'red';
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+      }
     }
 
     function initOffsetOptions() {
@@ -1281,29 +1265,6 @@
       return lines.join('\n');
     }
 
-    function renderAutomation(auto) {
-      const ab = document.getElementById('autoBuyBadge');
-      const as = document.getElementById('autoSellBadge');
-      if (!ab || !as) return;
-
-      const apply = (el, label, on) => {
-        el.classList.toggle('on', on === true);
-        const stateEl = el.querySelector('.auto-state');
-        const nameEl = el.querySelector('.auto-name');
-        if (nameEl) nameEl.textContent = label;
-        if (stateEl) stateEl.textContent = on === null || on === undefined ? '—' : (on ? 'ON' : 'OFF');
-      };
-
-      if (!auto || typeof auto !== 'object') {
-        apply(ab, 'Auto Buy', null);
-        apply(as, 'Auto Sell', null);
-        return;
-      }
-
-      apply(ab, 'Auto Buy', !!auto.auto_buy_enabled);
-      apply(as, 'Auto Sell', !!auto.auto_sell_enabled);
-    }
-
     function formatDuration(totalSeconds) {
       const sec = Math.max(0, Math.ceil(Number(totalSeconds) || 0));
       const mins = Math.floor(sec / 60);
@@ -1421,7 +1382,6 @@
         setTopIndexLtp(getSelectedBaseIndex(), null);
       }
 
-      renderAutomation(data.automation);
       lastRisk = risk;
       renderRisk(risk, systemTradingEnabled);
 
@@ -1852,6 +1812,7 @@
       });
     }
     bindClick(suggestBtn, () => { suggestSymbol(); });
+    bindClick(document.getElementById('symbolRefreshBtn'), () => { refreshSymbolFromBrokerLtp(); });
     if (strikeOffsetEl) {
       strikeOffsetEl.addEventListener('change', () => {
         if (getIndexLtpValue() > 0) suggestSymbol();

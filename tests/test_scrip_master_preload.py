@@ -261,6 +261,14 @@ class TradePayloadAndFrontendTests(unittest.TestCase):
         self.assertIsNotNone(trade_match, "executeTrade() not found in index.html")
         self.assertNotIn("refreshAtmStrikeFromLtp", trade_match.group(1))
 
+    def test_frontend_symbol_refresh_from_broker_ltp(self):
+        html = Path("web/backend/static/index.html").read_text(encoding="utf-8")
+        self.assertNotIn("autoBuyBadge", html)
+        self.assertNotIn("renderAutomation", html)
+        self.assertIn("async function refreshSymbolFromBrokerLtp", html)
+        self.assertIn("fetchIndexLtpForSelectedIndex({ suggestAfter: true })", html)
+        self.assertIn('id="symbolRefreshBtn"', html)
+
 
 if __name__ == "__main__":
     unittest.main()
