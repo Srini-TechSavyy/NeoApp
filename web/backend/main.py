@@ -361,7 +361,18 @@ def kill_switch_status():
     response_model=KillSwitchActivateResponse,
 )
 def kill_switch_activate():
-    status = activate_kill_switch()
+    try:
+        status = activate_kill_switch()
+    except OSError as exc:
+        logger.exception("Kill switch activate failed (check KILL_SWITCH_FILE path and permissions)")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"Kill switch state could not be saved: {exc}. "
+                "Set KILL_SWITCH_FILE to a writable path "
+                "(e.g. /opt/neoapp2/shared/data/kill_switch.json)."
+            ),
+        ) from exc
     until = str(status.get("expires_at_ist") or "midnight IST")
     return KillSwitchActivateResponse(
         ok=True,

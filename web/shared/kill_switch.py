@@ -29,6 +29,9 @@ def _load_raw() -> Dict[str, Any]:
 
 def _save_raw(data: Dict[str, Any]) -> None:
     path = _abs_path(KILL_SWITCH_FILE)
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f)
 

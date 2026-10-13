@@ -179,6 +179,19 @@ class KillSwitchApiTests(unittest.TestCase):
         self.assertTrue(body.get("active"))
         self.assertIn("IST", body.get("expires_at_ist", ""))
 
+    def test_kill_switch_activate_save_error_returns_503(self):
+        from fastapi.testclient import TestClient
+        from web.backend.main import app
+
+        with patch(
+            "web.backend.main.activate_kill_switch",
+            side_effect=PermissionError("[Errno 13] Permission denied: '/opt/neoapp2/current/kill_switch.json'"),
+        ):
+            with TestClient(app) as client:
+                resp = client.post("/api/kill-switch/activate")
+        self.assertEqual(resp.status_code, 503)
+        self.assertIn("KILL_SWITCH_FILE", resp.json().get("detail", ""))
+
 
 class KillSwitchFrontendTests(unittest.TestCase):
     def test_index_html_includes_kill_switch_controls(self):

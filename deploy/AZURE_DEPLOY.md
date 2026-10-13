@@ -13,7 +13,7 @@ Cloudflare deployment remains separate; see [docs/CLOUDFLARE_DEPLOYMENT.md](../d
 ├── current -> releases/...  # Active release symlink
 └── shared/
     ├── logs/                # Snapshot, lock, trade journal CSVs
-    ├── data/                # buy_disabled.json (risk controls)
+    ├── data/                # buy_disabled.json, kill_switch.json (risk controls)
     └── assets/              # nse_fo.csv, bse_fo.csv (not in git)
 
 /etc/neoapp2/neoapp.env       # Secrets and path overrides (640, root:neoapp)
@@ -77,6 +77,16 @@ sudo chown neoapp:neoapp /opt/neoapp2/shared/assets/*.csv
 ```
 
 See also [docs/VM_SECRET_UPDATE.md](../docs/VM_SECRET_UPDATE.md).
+
+**Existing VMs (kill switch):** If `neoapp.env` was created before `KILL_SWITCH_FILE` was added to [deploy/env.example](env.example), add the shared path and restart FastAPI:
+
+```bash
+grep -q '^KILL_SWITCH_FILE=' /etc/neoapp2/neoapp.env || \
+  echo 'KILL_SWITCH_FILE=/opt/neoapp2/shared/data/kill_switch.json' | sudo tee -a /etc/neoapp2/neoapp.env
+sudo mkdir -p /opt/neoapp2/shared/data
+sudo chown neoapp:neoapp /opt/neoapp2/shared/data
+sudo systemctl restart neo-fastapi.service
+```
 
 ### Enable live trading (manual, after validation)
 
@@ -291,6 +301,7 @@ curl -fsS http://127.0.0.1:8000/health
 |--------|----------------|
 | Health check fails after deploy | Check `journalctl -u neo-fastapi`; rollback may have run |
 | 503 on API routes | `WEB_API_TOKEN` empty and `WEB_ALLOW_LOCAL_NOAUTH=false` |
+| 500 or 503 on `POST /api/kill-switch/activate` | `KILL_SWITCH_FILE` missing or pointing at `/opt/neoapp2/current/` (release dir not writable by `neoapp`). Set `KILL_SWITCH_FILE=/opt/neoapp2/shared/data/kill_switch.json` in `neoapp.env`, restart `neo-fastapi`. Confirm with `journalctl -u neo-fastapi -n 50` (`PermissionError` on `current/kill_switch.json` is the usual signature). |
 | Worker stale / empty snapshot | Neo login failure; check credentials in `neoapp.env` and worker logs |
 | Symbol not found | Missing or outdated CSV in `shared/assets/` |
 | pip install fails on deploy | Install `git` and `build-essential`; network to GitHub for Neo API package |
