@@ -490,8 +490,96 @@
       color: var(--muted);
     }
     .web-connect .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+    .web-connect .kill-switch-row {
+      margin-top: 10px;
+      margin-bottom: 4px;
+    }
+    .kill-switch-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+    .kill-switch-title {
+      font-size: 12px;
+      color: var(--text);
+      font-weight: 650;
+    }
+    .kill-switch-status {
+      font-size: 12px;
+      font-weight: 600;
+    }
+    @media (min-width: 480px) {
+      .kill-switch-status { white-space: nowrap; }
+    }
+    .kill-switch-toggle {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 44px;
+      min-height: 44px;
+      margin: -8px;
+      padding: 8px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .kill-switch-input {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .kill-switch-track {
+      display: block;
+      width: 48px;
+      height: 28px;
+      border-radius: 999px;
+      background: #cbd5e1;
+      border: 1px solid #94a3b8;
+      box-sizing: border-box;
+      transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+      position: relative;
+    }
+    .kill-switch-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+      transition: transform 0.15s ease;
+    }
+    .kill-switch-input:checked + .kill-switch-track,
+    .kill-switch-group.is-active .kill-switch-track {
+      background: var(--exit);
+      border-color: #b91c1c;
+      box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.25);
+    }
+    .kill-switch-input:checked + .kill-switch-track .kill-switch-thumb,
+    .kill-switch-group.is-active .kill-switch-thumb {
+      transform: translateX(20px);
+    }
+    .kill-switch-input:focus-visible + .kill-switch-track {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .kill-switch-input:disabled + .kill-switch-track {
+      opacity: 0.65;
+    }
+    .kill-switch-toggle:has(.kill-switch-input:disabled) {
+      cursor: not-allowed;
+    }
     .web-connect .ltp-row { margin-top: 6px; }
-    .web-connect label { font-size: 12px; color: var(--muted); font-weight: 600; }
+    .web-connect label:not(.kill-switch-toggle) { font-size: 12px; color: var(--muted); font-weight: 600; }
     #message { font-size: 12px; margin-top: 6px; }
     #tradeResponse {
       width: 100%;
@@ -705,11 +793,15 @@
       <details class="web-connect">
         <summary>Web connection (snapshot &amp; orders)</summary>
         <div class="row kill-switch-row">
-          <label class="kill-switch-label" for="killSwitchToggle">
-            <input type="checkbox" id="killSwitchToggle" />
-            Daily Kill Switch
-          </label>
-          <span id="killSwitchStatus" class="muted">Inactive</span>
+          <div class="kill-switch-group" id="killSwitchGroup">
+            <label class="kill-switch-toggle" for="killSwitchToggle">
+              <input type="checkbox" id="killSwitchToggle" class="kill-switch-input"
+                     role="switch" aria-labelledby="killSwitchTitle" aria-describedby="killSwitchStatus" />
+              <span class="kill-switch-track" aria-hidden="true"><span class="kill-switch-thumb"></span></span>
+            </label>
+            <span id="killSwitchTitle" class="kill-switch-title">Daily Kill Switch</span>
+            <span id="killSwitchStatus" class="kill-switch-status muted">Inactive</span>
+          </div>
         </div>
         <div class="row">
           <label for="token">API Token</label>
@@ -1042,17 +1134,22 @@
     function updateKillSwitchUi() {
       const toggle = document.getElementById('killSwitchToggle');
       const statusEl = document.getElementById('killSwitchStatus');
+      const group = document.getElementById('killSwitchGroup');
       if (!toggle || !statusEl) return;
       const active = !!(killSwitchState && killSwitchState.active);
       toggle.checked = active;
       toggle.disabled = active || killSwitchActivating;
+      toggle.setAttribute('aria-checked', active ? 'true' : 'false');
+      if (group) group.classList.toggle('is-active', active);
       if (active) {
         const until = killSwitchState.expires_at_ist || 'midnight IST';
         statusEl.textContent = `Active — BUY disabled until ${until}`;
-        statusEl.className = 'red';
+        statusEl.className = 'kill-switch-status red';
+        statusEl.title = `BUY disabled until ${until}`;
       } else {
         statusEl.textContent = 'Inactive';
-        statusEl.className = 'muted';
+        statusEl.className = 'kill-switch-status muted';
+        statusEl.removeAttribute('title');
       }
     }
 
