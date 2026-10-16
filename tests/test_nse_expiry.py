@@ -98,6 +98,27 @@ class ScripMasterContractTests(unittest.TestCase):
         self.assertEqual(monthly, (2026, 10, 28))
         self.assertNotEqual(monthly, (9999, 12, 31))
 
+    def test_expiry_sort_key_october_weekly_26O19(self):
+        weekly = scrip_master._expiry_sort_key("26O19")
+        self.assertEqual(weekly, (2026, 10, 19))
+        self.assertNotEqual(weekly, (9999, 12, 31))
+
+    def test_list_valid_nifty_expiries_oct_2026_prefers_26O19_over_26OCT(self):
+        scrip_master._token_cache = {
+            "NIFTY26O1925000CE": "1",
+            "NIFTY26OCT25000CE": "2",
+        }
+        with patch(
+            "common.nse_expiry.theoretical_expiry_tokens",
+            return_value=["26O19", "26OCT"],
+        ):
+            expiries = scrip_master.list_valid_nifty_expiries(date(2026, 10, 16))
+        self.assertEqual(expiries[0], "26O19")
+        self.assertEqual(
+            scrip_master.get_nearest_valid_nifty_expiry(date(2026, 10, 16)),
+            "26O19",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

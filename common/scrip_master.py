@@ -212,7 +212,10 @@ def _expiry_sort_key(expiry: str) -> tuple:
         if len(e) == 5 and e[2] in "123456789OND":
             yy = 2000 + int(e[:2])
             month_ch = e[2]
-            mm = _MONTH_LETTER_TO_NUM.get(month_ch, int(month_ch))
+            if month_ch in _MONTH_LETTER_TO_NUM:
+                mm = _MONTH_LETTER_TO_NUM[month_ch]
+            else:
+                mm = int(month_ch)
             dd = int(e[3:5])
             return (yy, mm, dd)
     except Exception:
