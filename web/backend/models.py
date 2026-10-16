@@ -95,6 +95,15 @@ class SuggestSymbolResponse(BaseModel):
     base_symbol: str
     option_type: str
     offset: int
+    expiry: Optional[str] = None
+    instrument_token: Optional[str] = None
+
+
+class SymbolExpiriesResponse(BaseModel):
+    ok: bool
+    base_symbol: str
+    expiries: List[str]
+    nearest: Optional[str] = None
 
 
 class IndexLtpResponse(BaseModel):

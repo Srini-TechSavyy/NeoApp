@@ -726,7 +726,7 @@
           </div>
           <div class="strip-cell">
             <span class="strip-lbl">Expiry</span>
-            <select id="expirySelect" aria-label="Expiry" disabled title="Synced from symbol; use Suggest to update">
+            <select id="expirySelect" aria-label="Expiry" title="Upcoming NIFTY expiries from instrument master">
               <option value="">—</option>
             </select>
           </div>
@@ -898,10 +898,66 @@
       return e;
     }
 
+    let cachedExpiryTokens = [];
+
+    function populateExpirySelect(expiries, selectedToken) {
+      const sel = document.getElementById('expirySelect');
+      if (!sel) return;
+      cachedExpiryTokens = Array.isArray(expiries) ? expiries : [];
+      sel.innerHTML = '';
+      if (!cachedExpiryTokens.length) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '—';
+        sel.appendChild(opt);
+        return;
+      }
+      let pick = selectedToken || '';
+      const parts = parseSymbolParts(tradeSymbolEl?.value || '');
+      if (!pick && parts?.expiry) pick = parts.expiry;
+      if (!pick || !cachedExpiryTokens.includes(pick)) {
+        pick = cachedExpiryTokens[0];
+      }
+      for (const exp of cachedExpiryTokens) {
+        const opt = document.createElement('option');
+        opt.value = exp;
+        opt.textContent = formatExpiryDisplay(exp);
+        sel.appendChild(opt);
+      }
+      sel.value = pick;
+    }
+
+    async function loadExpiryOptions(selectedToken) {
+      const base = getSelectedBaseIndex();
+      if (base !== 'NIFTY') {
+        syncExpiryFromSymbol();
+        return;
+      }
+      const token = tokenEl.value.trim();
+      try {
+        const r = await fetch(
+          `/api/symbol/expiries?base_symbol=${encodeURIComponent(base)}`,
+          { headers: token ? { 'X-API-Key': token } : {} }
+        );
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          syncExpiryFromSymbol();
+          return;
+        }
+        populateExpirySelect(j.expiries || [], selectedToken || j.nearest || '');
+      } catch (_) {
+        syncExpiryFromSymbol();
+      }
+    }
+
     function syncExpiryFromSymbol() {
       const sel = document.getElementById('expirySelect');
       if (!sel) return;
       const parts = parseSymbolParts(tradeSymbolEl?.value || '');
+      if (cachedExpiryTokens.length && getSelectedBaseIndex() === 'NIFTY') {
+        populateExpirySelect(cachedExpiryTokens, parts?.expiry || '');
+        return;
+      }
       sel.innerHTML = '';
       const opt = document.createElement('option');
       if (!parts || !parts.expiry) {
@@ -912,6 +968,19 @@
         opt.textContent = formatExpiryDisplay(parts.expiry);
       }
       sel.appendChild(opt);
+    }
+
+    function applyExpirySelection() {
+      const sel = document.getElementById('expirySelect');
+      const expiry = sel?.value || '';
+      if (!expiry) return;
+      const parts = parseSymbolParts(tradeSymbolEl?.value || '');
+      const base = getSelectedBaseIndex();
+      const opt = document.getElementById('optionType')?.value || parts?.opt || 'CE';
+      const strike = parts?.strike;
+      if (!Number.isFinite(strike) || strike <= 0) return;
+      tradeSymbolEl.value = `${base}${expiry}${strike}${opt}`;
+      syncExpiryFromSymbol();
     }
 
     function clampLots(n) {
@@ -1248,6 +1317,8 @@
         }
       }
       m = s.match(/^([A-Z]+?)([0-9]{2}[A-Z]{3})(\d+)(CE|PE)$/);
+      if (m) return { base: m[1], expiry: m[2], strike: parseInt(m[3], 10), opt: m[4] };
+      m = s.match(/^([A-Z]+?)([0-9]{2}[1-9OND][0-9]{2})(\d+)(CE|PE)$/);
       if (m) return { base: m[1], expiry: m[2], strike: parseInt(m[3], 10), opt: m[4] };
       m = s.match(/^([A-Z]+?)([0-9]{5})(\d+)(CE|PE)$/);
       if (m) return { base: m[1], expiry: m[2], strike: parseInt(m[3], 10), opt: m[4] };
@@ -1839,6 +1910,18 @@
         );
         return;
       }
+      if (action === 'BUY') {
+        const expirySel = document.getElementById('expirySelect');
+        const symParts = parseSymbolParts(trading_symbol);
+        if (!expirySel?.value || !symParts?.expiry) {
+          setTradeResult('BUY blocked: select a valid expiry from the dropdown.', 'red');
+          return;
+        }
+        if (symParts.expiry !== expirySel.value) {
+          setTradeResult('BUY blocked: symbol expiry does not match selected expiry.', 'red');
+          return;
+        }
+      }
       if (!Number.isFinite(lots) || lots < 1) {
         setTradeResult('Lots must be >= 1.', 'red');
         return;
@@ -1953,6 +2036,7 @@
         document.getElementById('suggestedSymbol').textContent = `Suggested: ${j.symbol}`;
         document.getElementById('suggestedSymbol').className = 'green';
         tradeSymbolEl.value = j.symbol;
+        await loadExpiryOptions(j.expiry || '');
         syncExpiryFromSymbol();
       } catch (e) {
         document.getElementById('suggestedSymbol').textContent = `Suggest: ${String(e?.message || e)}`;
@@ -1999,6 +2083,7 @@
         await loadSystemStatus(token);
         await loadKillSwitch(token);
         await fetchIndexLtpForSelectedIndex({ suggestAfter: true });
+        await loadExpiryOptions();
         connectWs(token);
       } catch (e) {
         setStatus(String(e.message || e), 'red');
@@ -2043,7 +2128,13 @@
         const manual = document.getElementById('indexLtpManual');
         if (manual && !manual.matches(':focus')) manual.value = '';
         await fetchIndexLtpForSelectedIndex({ suggestAfter: true });
+        await loadExpiryOptions();
       });
+    }
+
+    const expirySelectEl = document.getElementById('expirySelect');
+    if (expirySelectEl) {
+      expirySelectEl.addEventListener('change', () => { applyExpirySelection(); });
     }
 
     if (tradeSymbolEl) {

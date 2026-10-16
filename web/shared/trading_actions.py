@@ -9,6 +9,7 @@ from common.scrip_master import (
     get_lot_size_from_scrip_master,
     load_scrip_master_csv,
     resolve_trading_symbol,
+    validate_trading_symbol,
 )
 from web.shared.order_status import lookup_order_status
 from web.shared.trade_latency import TradeLatencyRecorder
@@ -169,22 +170,38 @@ def execute_market_action(
         latency.mark("after_neo_login")
 
     symbol = trading_symbol.strip().upper()
-    resolved = resolve_trading_symbol(symbol)
-    if resolved:
-        symbol = resolved
-    token = find_token_for_trading_symbol(symbol)
-    if not token:
-        load_scrip_master_csv()
-        resolved = resolve_trading_symbol(symbol) or symbol
-        symbol = resolved
+    side = "BUY" if action.upper() == "BUY" else "SELL"
+
+    if side == "BUY":
+        validation = validate_trading_symbol(symbol)
+        if not validation.get("ok"):
+            raise ValueError(validation.get("reason") or "invalid option contract for BUY")
+        symbol = str(validation["trading_symbol"]).upper()
+        token = str(validation["instrument_token"])
+        logger.info(
+            "order_contract_validated symbol=%s expiry=%s strike=%s opt_type=%s instrument_token=%s",
+            symbol,
+            validation.get("expiry_token"),
+            validation.get("strike"),
+            validation.get("opt_type"),
+            token,
+        )
+    else:
+        resolved = resolve_trading_symbol(symbol)
+        if resolved:
+            symbol = resolved
         token = find_token_for_trading_symbol(symbol)
+        if not token:
+            load_scrip_master_csv()
+            resolved = resolve_trading_symbol(symbol) or symbol
+            symbol = resolved
+            token = find_token_for_trading_symbol(symbol)
+
     if latency:
         latency.mark("after_symbol_lookup")
 
     if not token:
         raise ValueError(f"Token not found for symbol: {symbol}")
-
-    side = "BUY" if action.upper() == "BUY" else "SELL"
 
     positions = _get_open_positions(client)
     if latency:

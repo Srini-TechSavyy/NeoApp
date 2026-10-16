@@ -3,6 +3,11 @@ from typing import Optional, Tuple
 
 from common.config import get_next_expiry
 from common.orders import detect_strike_step
+from common.scrip_master import (
+    get_nearest_valid_nifty_expiry,
+    load_scrip_master_csv,
+    validate_option_contract,
+)
 
 
 def get_underlying_index(symbol: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
@@ -67,6 +72,19 @@ def suggest_option_symbol(base_symbol: str, index_ltp: float, option_type: str, 
         strike = int(atm + (offset * strike_step))
     else:
         strike = int(atm - (offset * strike_step))
+
+    if base == "NIFTY":
+        try:
+            load_scrip_master_csv()
+        except FileNotFoundError:
+            pass
+        expiry = get_nearest_valid_nifty_expiry()
+        if not expiry:
+            expiry = get_next_expiry(base)
+        result = validate_option_contract(base, expiry, strike, opt_type)
+        if not result.get("ok"):
+            raise ValueError(result.get("reason") or "invalid NIFTY option contract")
+        return result["trading_symbol"]
 
     expiry = get_next_expiry(base)
     return f"{base}{expiry}{strike}{opt_type}"

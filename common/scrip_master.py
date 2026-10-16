@@ -2,7 +2,7 @@
 import os
 import re
 import pandas as pd
-from typing import Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 import time
 from datetime import datetime
 from .utils import log_with_callback
@@ -194,6 +194,12 @@ def _normalize_weekly_expiry(expiry: str) -> str:
     return e
 
 
+def _expiry_tokens_equivalent(requested: str, actual: str) -> bool:
+    a = _normalize_weekly_expiry(str(requested).strip().upper())
+    b = _normalize_weekly_expiry(str(actual).strip().upper())
+    return a == b or requested.strip().upper() == actual.strip().upper()
+
+
 def _expiry_sort_key(expiry: str) -> tuple:
     """Rough chronological key for weekly/monthly expiry codes."""
     e = _normalize_weekly_expiry(expiry)
@@ -279,23 +285,105 @@ def resolve_trading_symbol(trading_symbol: str, log_cb=None) -> Optional[str]:
         return None
 
     for key, c_expiry in candidates:
-        if c_expiry == expiry or _normalize_weekly_expiry(c_expiry) == intended:
+        if _expiry_tokens_equivalent(expiry, c_expiry):
             if key != ts:
                 log_with_callback(log_cb, f"Resolved trading symbol {ts} -> {key}")
             return key
 
-    # Prefer nearest future expiry; fall back to lexicographically first.
-    today_key = (datetime.now().year, datetime.now().month, datetime.now().day)
+    return None
 
-    def rank(item):
-        key, c_expiry = item
-        ek = _expiry_sort_key(c_expiry)
-        future_penalty = 0 if ek >= today_key else 1
-        return (future_penalty, ek, key)
 
-    best = sorted(candidates, key=rank)[0][0]
-    log_with_callback(log_cb, f"Resolved trading symbol {ts} -> {best} (nearest expiry match)")
-    return best
+def build_option_symbol(base: str, expiry_token: str, strike: int, opt_type: str) -> str:
+    b = str(base).strip().upper().replace("NIFTY_50", "NIFTY")
+    opt = str(opt_type).strip().upper()
+    exp = str(expiry_token).strip().upper()
+    return f"{b}{exp}{int(strike)}{opt}"
+
+
+def list_master_expiry_tokens(base: str = "NIFTY") -> List[str]:
+    base_u = str(base).strip().upper().replace("NIFTY_50", "NIFTY")
+    tokens: set[str] = set()
+    for key in _token_cache_keys():
+        parts = _parse_option_symbol(key)
+        if not parts:
+            continue
+        c_base, c_expiry, _, _ = parts
+        if c_base == base_u:
+            tokens.add(c_expiry)
+    return sorted(tokens, key=_expiry_sort_key)
+
+
+def list_valid_nifty_expiries(from_date=None) -> List[str]:
+    from common.nse_calendar import ist_today
+    from common.nse_expiry import theoretical_expiry_tokens
+
+    today = from_date or ist_today()
+    today_key = (today.year, today.month, today.day)
+    master = set(list_master_expiry_tokens("NIFTY"))
+    theoretical = set(theoretical_expiry_tokens(today, limit=32))
+    valid = [t for t in theoretical if t in master]
+    valid = [t for t in valid if _expiry_sort_key(t) >= today_key]
+    return sorted(valid, key=_expiry_sort_key)
+
+
+def get_nearest_valid_nifty_expiry(from_date=None) -> Optional[str]:
+    expiries = list_valid_nifty_expiries(from_date)
+    return expiries[0] if expiries else None
+
+
+def validate_option_contract(
+    base: str,
+    expiry_token: str,
+    strike: int,
+    opt_type: str,
+    *,
+    strict_expiry: bool = True,
+    log_cb=None,
+) -> Dict[str, Any]:
+    base_u = str(base).strip().upper().replace("NIFTY_50", "NIFTY")
+    opt = str(opt_type).strip().upper()
+    exp = str(expiry_token).strip().upper()
+    if not exp:
+        return {"ok": False, "reason": "missing expiry"}
+    if opt not in ("CE", "PE"):
+        return {"ok": False, "reason": "invalid option type"}
+
+    built = build_option_symbol(base_u, exp, strike, opt)
+    trading_symbol = resolve_trading_symbol(built, log_cb=log_cb)
+    if not trading_symbol:
+        return {"ok": False, "reason": f"contract not found in instrument master: {built}"}
+
+    token = _lookup_token_exact(trading_symbol)
+    if not token:
+        return {"ok": False, "reason": f"instrument token missing for {trading_symbol}"}
+
+    parsed = _parse_option_symbol(trading_symbol)
+    if not parsed:
+        return {"ok": False, "reason": f"unparseable broker symbol: {trading_symbol}"}
+
+    p_base, p_expiry, p_strike, p_opt = parsed
+    if p_base != base_u or p_strike != int(strike) or p_opt != opt:
+        return {"ok": False, "reason": "contract fields mismatch after resolution"}
+    if strict_expiry and not _expiry_tokens_equivalent(exp, p_expiry):
+        return {"ok": False, "reason": f"expiry mismatch: requested {exp}, master {p_expiry}"}
+
+    return {
+        "ok": True,
+        "trading_symbol": trading_symbol,
+        "instrument_token": token,
+        "expiry_token": p_expiry,
+        "strike": p_strike,
+        "opt_type": p_opt,
+        "base": p_base,
+    }
+
+
+def validate_trading_symbol(trading_symbol: str, log_cb=None) -> Dict[str, Any]:
+    parts = _parse_option_symbol(trading_symbol)
+    if not parts:
+        return {"ok": False, "reason": "invalid or unparseable trading symbol"}
+    base, expiry, strike, opt_type = parts
+    return validate_option_contract(base, expiry, strike, opt_type, log_cb=log_cb)
 
 
 def find_token_for_trading_symbol(trading_symbol: str, log_cb=None) -> Optional[str]:

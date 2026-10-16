@@ -36,6 +36,7 @@ from web.backend.models import (
     RiskResetResponse,
     SuggestSymbolRequest,
     SuggestSymbolResponse,
+    SymbolExpiriesResponse,
     SystemStatusResponse,
     TradeActionRequest,
     TradeActionResponse,
@@ -54,7 +55,8 @@ from web.shared.trade_orders import (
     complete_idempotent_trade,
     register_pending_order,
 )
-from web.shared.trading_actions import execute_market_action, preload_scrip_master
+from web.shared.trading_actions import execute_market_action, is_scrip_master_loaded, preload_scrip_master
+from common.scrip_master import get_nearest_valid_nifty_expiry, list_valid_nifty_expiries, load_scrip_master_csv, validate_trading_symbol
 
 logger = logging.getLogger("neoapp.web.api")
 logging.basicConfig(level=os.getenv("WEB_LOG_LEVEL", "INFO"))
@@ -429,6 +431,27 @@ def broker_session_reset():
     )
 
 
+@app.get("/api/symbol/expiries", dependencies=[Depends(require_api_key)], response_model=SymbolExpiriesResponse)
+def list_symbol_expiries(base_symbol: str = "NIFTY"):
+    base = str(base_symbol).strip().upper().replace("NIFTY_50", "NIFTY")
+    if base != "NIFTY":
+        raise HTTPException(status_code=400, detail="Only NIFTY expiries are supported")
+    try:
+        if not is_scrip_master_loaded():
+            load_scrip_master_csv()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail="Instrument master not loaded") from exc
+
+    expiries = list_valid_nifty_expiries()
+    nearest = get_nearest_valid_nifty_expiry()
+    return SymbolExpiriesResponse(
+        ok=True,
+        base_symbol=base,
+        expiries=expiries,
+        nearest=nearest,
+    )
+
+
 @app.post("/api/symbol/suggest", dependencies=[Depends(require_api_key)], response_model=SuggestSymbolResponse)
 def suggest_symbol(payload: SuggestSymbolRequest):
     try:
@@ -441,12 +464,23 @@ def suggest_symbol(payload: SuggestSymbolRequest):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    expiry = None
+    instrument_token = None
+    base = str(payload.base_symbol).strip().upper().replace("NIFTY_50", "NIFTY")
+    if base == "NIFTY":
+        v = validate_trading_symbol(symbol)
+        if v.get("ok"):
+            expiry = v.get("expiry_token")
+            instrument_token = v.get("instrument_token")
+
     return SuggestSymbolResponse(
         ok=True,
         symbol=symbol,
         base_symbol=payload.base_symbol,
         option_type=payload.option_type,
         offset=payload.offset,
+        expiry=expiry,
+        instrument_token=instrument_token,
     )
 
 

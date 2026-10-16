@@ -50,9 +50,13 @@ def get_next_expiry(symbol: str) -> str:
     """
     now = datetime.now()
     weekday = now.weekday()  # Monday=0, Sunday=6
-    symbol_upper = symbol.upper()
+    symbol_upper = symbol.upper().replace("NIFTY_50", "NIFTY")
     if symbol_upper == "NIFTY":
-        expiry_weekday = 1  # Tuesday
+        from common.nse_expiry import get_next_nifty_expiry_token
+
+        expiry_str = get_next_nifty_expiry_token()
+        print(f"[DEBUG] get_next_expiry called: now={now}, symbol={symbol}, expiry_str={expiry_str}")
+        return expiry_str
     elif symbol_upper == "SENSEX":
         expiry_weekday = 3  # Thursday
     else:
