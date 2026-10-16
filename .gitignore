@@ -13,6 +13,7 @@ symbol_history.json
 miniforge.sh
 logs/*.json
 *.json
+!data/nse_trading_holidays.json
 bin/
 dist/
 node_modules/

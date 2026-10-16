@@ -204,17 +204,17 @@ def _expiry_sort_key(expiry: str) -> tuple:
     """Rough chronological key for weekly/monthly expiry codes."""
     e = _normalize_weekly_expiry(expiry)
     try:
+        if len(e) == 5 and e[2:].isalpha():
+            # Monthly YYMMM (e.g. 26OCT) — before weekly branch (O/N/D are month letters too)
+            yy = 2000 + int(e[:2])
+            mm = datetime.strptime(e[2:], "%b").month
+            return (yy, mm, 28)
         if len(e) == 5 and e[2] in "123456789OND":
             yy = 2000 + int(e[:2])
             month_ch = e[2]
             mm = _MONTH_LETTER_TO_NUM.get(month_ch, int(month_ch))
             dd = int(e[3:5])
             return (yy, mm, dd)
-        if len(e) == 5 and e[2:].isalpha():
-            # Monthly YYMMM — use mid-month as approximate
-            yy = 2000 + int(e[:2])
-            mm = datetime.strptime(e[2:], "%b").month
-            return (yy, mm, 28)
     except Exception:
         pass
     return (9999, 12, 31)

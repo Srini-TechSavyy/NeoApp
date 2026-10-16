@@ -463,6 +463,14 @@ def suggest_symbol(payload: SuggestSymbolRequest):
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (FileNotFoundError, OSError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"NSE holiday calendar or instrument master unavailable: {exc}",
+        ) from exc
+    except Exception as exc:
+        logger.exception("symbol_suggest_failed base_symbol=%s", payload.base_symbol)
+        raise HTTPException(status_code=503, detail=f"Symbol suggestion failed: {exc}") from exc
 
     expiry = None
     instrument_token = None

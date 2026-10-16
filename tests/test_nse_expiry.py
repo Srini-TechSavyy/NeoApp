@@ -93,6 +93,11 @@ class ScripMasterContractTests(unittest.TestCase):
         resolved = scrip_master.resolve_trading_symbol("NIFTY26102125000CE")
         self.assertEqual(resolved, "NIFTY26O2125000CE")
 
+    def test_expiry_sort_key_monthly_october_not_fallback(self):
+        monthly = scrip_master._expiry_sort_key("26OCT")
+        self.assertEqual(monthly, (2026, 10, 28))
+        self.assertNotEqual(monthly, (9999, 12, 31))
+
 
 if __name__ == "__main__":
     unittest.main()

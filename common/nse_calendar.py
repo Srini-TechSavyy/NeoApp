@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date, datetime, timedelta
 from functools import lru_cache
 from typing import FrozenSet, Optional
@@ -9,20 +10,40 @@ from typing import FrozenSet, Optional
 from common.time_utils import MARKET_TZ, _as_ist
 from common.utils import get_resource_path
 
+logger = logging.getLogger(__name__)
+
 _HOLIDAYS_PATH = "data/nse_trading_holidays.json"
 
 
 @lru_cache(maxsize=1)
 def _load_holiday_dates() -> FrozenSet[date]:
     path = get_resource_path(_HOLIDAYS_PATH)
-    with open(path, encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        logger.warning(
+            "NSE holiday calendar missing at %s; treating exchange holidays as empty (weekends only)",
+            path,
+        )
+        return frozenset()
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        logger.warning(
+            "NSE holiday calendar unreadable at %s (%s); treating exchange holidays as empty",
+            path,
+            exc,
+        )
+        return frozenset()
+
     raw = data.get("holidays") or []
     out = set()
     for item in raw:
         if not item or str(item).startswith("_"):
             continue
-        out.add(date.fromisoformat(str(item).strip()))
+        try:
+            out.add(date.fromisoformat(str(item).strip()))
+        except ValueError:
+            logger.warning("Skipping invalid NSE holiday date entry: %s", item)
     return frozenset(out)
 
 
