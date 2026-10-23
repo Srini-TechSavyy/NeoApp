@@ -896,6 +896,7 @@
     let trackedPendingOrderId = null;
     let trackedPendingAction = null;
     let tradeInFlight = false;
+    let currentPosition = null;
     const buyBtn = document.getElementById('buyBtn');
     const exitBtn = document.getElementById('exitBtn');
     const suggestBtn = document.getElementById('suggestBtn');
@@ -1776,7 +1777,8 @@
       renderRisk(risk, systemTradingEnabled);
 
       const posEl = document.getElementById('positionLabel');
-      const positionOpen = !!(position && position.symbol);
+      const positionOpen = !!(position && position.symbol && Number(position.qty) !== 0);
+      currentPosition = positionOpen ? position : null;
       if (positionOpen) {
         const ltpVal = Number(position.ltp);
         const hasLtp = Number.isFinite(ltpVal) && ltpVal > 0;
@@ -1996,6 +1998,18 @@
       if (summary.completed) {
         tradeStatusEl.textContent = 'Filled';
         tradeStatusEl.className = 'green';
+        if (trackedPendingAction === 'EXIT') {
+          currentPosition = null;
+          const posEl = document.getElementById('positionLabel');
+          if (posEl) {
+            posEl.textContent = '● NO POSITION';
+            posEl.className = 'flat';
+          }
+          const token = tokenEl.value.trim();
+          if (token) {
+            setTimeout(() => { loadSnapshot(token).catch(() => {}); }, 800);
+          }
+        }
         trackedPendingOrderId = null;
         trackedPendingAction = null;
       } else if (summary.cls === 'red') {
@@ -2013,13 +2027,21 @@
       if (tradeInFlight) return;
       const token = tokenEl.value.trim();
       let trading_symbol = tradeSymbolEl.value.trim().toUpperCase();
-      const lots = Number(tradeLotsEl.value || '0');
+      let lots = Number(tradeLotsEl.value || '0');
 
-      // Avoid a redundant /api/symbol/suggest round-trip when the symbol is already set.
-      // Suggest only if the required trading symbol is missing/invalid and LTP can resolve one.
-      if ((!trading_symbol || trading_symbol.length < 5) && getIndexLtpValue() > 0) {
-        await suggestSymbol();
-        trading_symbol = tradeSymbolEl.value.trim().toUpperCase();
+      if (action === 'EXIT') {
+        if (currentPosition && currentPosition.symbol) {
+          trading_symbol = currentPosition.symbol;
+        }
+        if (!lots || lots < 1) {
+          lots = 1;
+        }
+      } else {
+        // Suggest only if action is BUY and required trading symbol is missing/invalid
+        if ((!trading_symbol || trading_symbol.length < 5) && getIndexLtpValue() > 0) {
+          await suggestSymbol();
+          trading_symbol = tradeSymbolEl.value.trim().toUpperCase();
+        }
       }
 
       if (!trading_symbol || trading_symbol.length < 5) {
@@ -2096,11 +2118,32 @@
         } else if (summary.completed) {
           tradeStatusEl.textContent = 'Filled';
           tradeStatusEl.className = 'green';
+          if (action === 'EXIT') {
+            currentPosition = null;
+            const posEl = document.getElementById('positionLabel');
+            if (posEl) {
+              posEl.textContent = '● NO POSITION';
+              posEl.className = 'flat';
+            }
+            if (token) {
+              setTimeout(() => { loadSnapshot(token).catch(() => {}); }, 800);
+            }
+          }
           trackedPendingOrderId = null;
           trackedPendingAction = null;
         } else if (summary.pendingFill) {
           tradeStatusEl.textContent = 'Awaiting fill confirmation';
           tradeStatusEl.className = 'muted';
+          if (action === 'EXIT') {
+            const posEl = document.getElementById('positionLabel');
+            if (posEl) {
+              posEl.textContent = '● EXIT SUBMITTED...';
+              posEl.className = 'muted';
+            }
+            if (token) {
+              setTimeout(() => { loadSnapshot(token).catch(() => {}); }, 1200);
+            }
+          }
         } else {
           tradeStatusEl.textContent = 'Acknowledged';
           tradeStatusEl.className = 'muted';

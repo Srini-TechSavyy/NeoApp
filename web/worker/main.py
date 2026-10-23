@@ -1,3 +1,4 @@
+from collections import defaultdict
 import os
 import sys
 import time
@@ -50,7 +51,10 @@ def _now() -> str:
 
 
 def _is_session_error(exc: Exception) -> bool:
-    msg = str(exc).lower()
+    try:
+        msg = str(exc or "").lower()
+    except Exception:
+        msg = ""
     markers = [
         "401",
         "403",
@@ -74,27 +78,61 @@ def _normalize_list_payload(payload):
 
 def _extract_open_position(client):
     data = _normalize_list_payload(client.positions())
+    if not data:
+        return None
+
+    positions_by_symbol = defaultdict(list)
     for p in data:
-        sym = str(p.get("trdSym", "")).upper()
+        sym = str(p.get("trdSym", "")).strip().upper()
+        if not sym or "-EQ" in sym:
+            continue
         exch = str(p.get("exch", "")).lower()
-        fl_buy = float(p.get("flBuyQty", 0) or 0)
-        fl_sell = float(p.get("flSellQty", 0) or 0)
-        qty = int(float(p.get("netQty", fl_buy - fl_sell) or 0))
-        if qty == 0:
-            continue
-        if "-EQ" in sym:
-            continue
         if "fo" in exch or any(x in sym for x in ["NIFTY", "SENSEX", "BANKNIFTY", "FINNIFTY", "BANKEX"]):
-            avg_p = p.get("avgPrc") or p.get("buyAvgPrc") or p.get("buyAvg")
-            if (not avg_p or float(avg_p) == 0) and fl_buy > 0:
-                buy_amt = float(p.get("buyAmt", 0) or 0)
-                avg_p = buy_amt / fl_buy if fl_buy > 0 else 0
+            positions_by_symbol[sym].append(p)
+
+    for sym, rows in positions_by_symbol.items():
+        total_net_qty = 0
+        total_buy_qty = 0
+        total_buy_val = 0.0
+        primary_exch = ""
+        open_product = "MIS"
+
+        for p in rows:
+            fl_buy = float(p.get("flBuyQty", 0) or 0)
+            fl_sell = float(p.get("flSellQty", 0) or 0)
+            cf_buy = float(p.get("cfBuyQty", 0) or 0)
+            cf_sell = float(p.get("cfSellQty", 0) or 0)
+
+            raw_net = p.get("netQty")
+            if raw_net is not None and str(raw_net).strip() != "":
+                row_qty = int(float(str(raw_net)))
+            else:
+                row_qty = int(float((cf_buy + fl_buy) - (cf_sell + fl_sell)))
+
+            total_net_qty += row_qty
+            if row_qty > 0:
+                open_product = str(p.get("prod") or p.get("prd") or "MIS").strip().upper()
+                avg_p = p.get("avgPrc") or p.get("buyAvgPrc") or p.get("buyAvg")
+                if not avg_p or float(avg_p) == 0:
+                    buy_amt = float(p.get("buyAmt", 0) or 0)
+                    avg_p = (buy_amt / fl_buy) if fl_buy > 0 else 0
+                avg_val = float(avg_p or 0)
+                total_buy_qty += row_qty
+                total_buy_val += (avg_val * row_qty)
+
+            if not primary_exch:
+                primary_exch = str(p.get("exch", "")).lower()
+
+        if total_net_qty != 0:
+            avg_entry = round(total_buy_val / total_buy_qty, 4) if total_buy_qty > 0 else 0.0
             return {
                 "symbol": sym,
-                "qty": qty,
-                "entry_price": float(avg_p or 0),
-                "exchange": exch,
+                "qty": total_net_qty,
+                "entry_price": avg_entry,
+                "exchange": primary_exch,
+                "product": open_product,
             }
+
     return None
 
 

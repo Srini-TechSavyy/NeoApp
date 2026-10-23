@@ -17,7 +17,7 @@ client = NeoAPI(
     environment="prod"
 )
 
-  = pyotp.TOTP(TOTP_SECRET).now()
+totp = pyotp.TOTP(TOTP_SECRET).now()
 
 login_resp = client.totp_login(
     mobile_number=MOBILE,

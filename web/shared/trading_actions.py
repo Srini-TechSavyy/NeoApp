@@ -1,3 +1,4 @@
+from collections import defaultdict
 import logging
 import threading
 import time
@@ -77,17 +78,26 @@ def _get_open_positions(client) -> List[dict]:
 
 
 def _has_open_derivative_position(positions: List[dict]) -> Tuple[bool, Optional[str]]:
+    net_by_sym: Dict[str, int] = defaultdict(int)
     for p in positions:
-        sym = str(p.get("trdSym", "")).upper()
+        sym = str(p.get("trdSym", "")).strip().upper()
         exch = str(p.get("exch", "")).lower()
-        fl_buy = float(p.get("flBuyQty", 0) or 0)
-        fl_sell = float(p.get("flSellQty", 0) or 0)
-        qty = int(float(p.get("netQty", fl_buy - fl_sell) or 0))
-        if qty == 0:
-            continue
-        if "-EQ" in sym:
+        if not sym or "-EQ" in sym:
             continue
         if "fo" in exch or any(x in sym for x in ["NIFTY", "SENSEX", "BANKNIFTY", "FINNIFTY", "BANKEX"]):
+            fl_buy = float(p.get("flBuyQty", 0) or 0)
+            fl_sell = float(p.get("flSellQty", 0) or 0)
+            cf_buy = float(p.get("cfBuyQty", 0) or 0)
+            cf_sell = float(p.get("cfSellQty", 0) or 0)
+            raw_net = p.get("netQty")
+            if raw_net is not None and str(raw_net).strip() != "":
+                row_qty = int(float(str(raw_net)))
+            else:
+                row_qty = int(float((cf_buy + fl_buy) - (cf_sell + fl_sell)))
+            net_by_sym[sym] += row_qty
+
+    for sym, qty in net_by_sym.items():
+        if qty != 0:
             return True, sym
     return False, None
 
@@ -172,73 +182,100 @@ def execute_market_action(
     symbol = trading_symbol.strip().upper()
     side = "BUY" if action.upper() == "BUY" else "SELL"
 
-    if side == "BUY":
-        validation = validate_trading_symbol(symbol)
-        if not validation.get("ok"):
-            raise ValueError(validation.get("reason") or "invalid option contract for BUY")
-        symbol = str(validation["trading_symbol"]).upper()
-        token = str(validation["instrument_token"])
-        logger.info(
-            "order_contract_validated symbol=%s expiry=%s strike=%s opt_type=%s instrument_token=%s",
-            symbol,
-            validation.get("expiry_token"),
-            validation.get("strike"),
-            validation.get("opt_type"),
-            token,
-        )
-    else:
-        resolved = resolve_trading_symbol(symbol)
-        if resolved:
-            symbol = resolved
-        token = find_token_for_trading_symbol(symbol)
-        if not token:
-            load_scrip_master_csv()
-            resolved = resolve_trading_symbol(symbol) or symbol
-            symbol = resolved
-            token = find_token_for_trading_symbol(symbol)
-
-    if latency:
-        latency.mark("after_symbol_lookup")
-
-    if not token:
-        raise ValueError(f"Token not found for symbol: {symbol}")
-
     positions = _get_open_positions(client)
     if latency:
         latency.mark("after_positions_api")
     has_pos, pos_sym = _has_open_derivative_position(positions)
 
-    if side == "BUY" and enforce_single_position and has_pos:
-        raise ValueError(f"Buy blocked: existing open position detected ({pos_sym})")
-
     selected_symbol = symbol
     selected_lots = int(lots)
-    if side == "SELL":
+    selected_product = "MIS"
+    selected_qty = None
+    token = None
+
+    if side == "BUY":
+        validation = validate_trading_symbol(symbol)
+        if not validation.get("ok"):
+            raise ValueError(validation.get("reason") or "invalid option contract for BUY")
+        selected_symbol = str(validation["trading_symbol"]).upper()
+        token = str(validation["instrument_token"])
+        logger.info(
+            "order_contract_validated symbol=%s expiry=%s strike=%s opt_type=%s instrument_token=%s",
+            selected_symbol,
+            validation.get("expiry_token"),
+            validation.get("strike"),
+            validation.get("opt_type"),
+            token,
+        )
+        if enforce_single_position and has_pos:
+            raise ValueError(f"Buy blocked: existing open position detected ({pos_sym})")
+    else:
+        # SELL / EXIT logic: identify target open position FIRST
         target_pos = None
+        cleaned_sym = symbol.replace(" ", "")
         for p in positions:
-            sym = str(p.get("trdSym", "")).upper()
-            if sym == symbol:
+            p_sym = str(p.get("trdSym", "")).strip().upper().replace(" ", "")
+            if p_sym == cleaned_sym:
                 target_pos = p
                 break
         if not target_pos and has_pos:
             for p in positions:
-                sym = str(p.get("trdSym", "")).upper()
-                fl_buy = float(p.get("flBuyQty", 0) or 0)
-                fl_sell = float(p.get("flSellQty", 0) or 0)
-                qty = int(float(p.get("netQty", fl_buy - fl_sell) or 0))
-                if qty != 0 and "-EQ" not in sym:
-                    target_pos = p
-                    break
+                p_sym = str(p.get("trdSym", "")).strip().upper()
+                if not p_sym or "-EQ" in p_sym:
+                    continue
+                exch_p = str(p.get("exch", "")).lower()
+                if "fo" in exch_p or any(x in p_sym for x in ["NIFTY", "SENSEX", "BANKNIFTY", "FINNIFTY", "BANKEX"]):
+                    fl_buy = float(p.get("flBuyQty", 0) or 0)
+                    fl_sell = float(p.get("flSellQty", 0) or 0)
+                    cf_buy = float(p.get("cfBuyQty", 0) or 0)
+                    cf_sell = float(p.get("cfSellQty", 0) or 0)
+                    raw_net = p.get("netQty")
+                    if raw_net is not None and str(raw_net).strip() != "":
+                        row_net = int(float(str(raw_net)))
+                    else:
+                        row_net = int(float((cf_buy + fl_buy) - (cf_sell + fl_sell)))
+                    if row_net != 0:
+                        target_pos = p
+                        break
 
         if target_pos:
-            selected_symbol = str(target_pos.get("trdSym", symbol)).upper()
+            selected_symbol = str(target_pos.get("trdSym", symbol)).strip().upper()
+            selected_product = str(target_pos.get("prod") or target_pos.get("prd") or "MIS").strip().upper()
             fl_buy = float(target_pos.get("flBuyQty", 0) or 0)
             fl_sell = float(target_pos.get("flSellQty", 0) or 0)
-            net_qty = int(float(target_pos.get("netQty", fl_buy - fl_sell) or 0))
-            selected_lots = _convert_quantity_to_lots(selected_symbol, net_qty)
-            token = find_token_for_trading_symbol(selected_symbol) or token
+            cf_buy = float(target_pos.get("cfBuyQty", 0) or 0)
+            cf_sell = float(target_pos.get("cfSellQty", 0) or 0)
+            raw_net = target_pos.get("netQty")
+            if raw_net is not None and str(raw_net).strip() != "":
+                net_qty = int(float(str(raw_net)))
+            else:
+                net_qty = int(float((cf_buy + fl_buy) - (cf_sell + fl_sell)))
+
+            selected_qty = abs(net_qty) if net_qty != 0 else None
+            selected_lots = _convert_quantity_to_lots(selected_symbol, net_qty) if net_qty != 0 else int(lots)
+            token = find_token_for_trading_symbol(selected_symbol)
+            if not token:
+                load_scrip_master_csv()
+                resolved = resolve_trading_symbol(selected_symbol) or selected_symbol
+                selected_symbol = resolved
+                token = find_token_for_trading_symbol(selected_symbol)
         elif enforce_single_position:
             raise ValueError("Exit blocked: no open derivative position found")
+        else:
+            resolved = resolve_trading_symbol(symbol) or symbol
+            selected_symbol = resolved
+            token = find_token_for_trading_symbol(selected_symbol)
+            if not token:
+                load_scrip_master_csv()
+                resolved = resolve_trading_symbol(symbol) or symbol
+                selected_symbol = resolved
+                token = find_token_for_trading_symbol(selected_symbol)
+
+    if latency:
+        latency.mark("after_symbol_lookup")
+
+    if not token:
+        raise ValueError(f"Token not found for symbol: {selected_symbol}")
 
     if latency:
         latency.mark("after_pre_order_logic")
@@ -249,6 +286,8 @@ def execute_market_action(
         side=side,
         trading_symbol=selected_symbol,
         latency_meta=meta,
+        product=selected_product,
+        quantity=selected_qty,
     )
     if latency:
         latency.mark("after_place_order_api")

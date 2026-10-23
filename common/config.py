@@ -54,7 +54,7 @@ def get_next_expiry(symbol: str) -> str:
     if symbol_upper == "NIFTY":
         from common.nse_expiry import get_next_nifty_expiry_token
 
-        expiry_str = get_next_nifty_expiry_token()
+        expiry_str = get_next_nifty_expiry_token(now)
         print(f"[DEBUG] get_next_expiry called: now={now}, symbol={symbol}, expiry_str={expiry_str}")
         return expiry_str
     elif symbol_upper == "SENSEX":

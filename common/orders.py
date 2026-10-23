@@ -53,7 +53,16 @@ def detect_strike_step(trading_symbol: str) -> int:
         return 50
     return 50 # Default for others
 
-def place_market_order(token, lots, side, trading_symbol, log_cb=None, latency_meta: Optional[Dict[str, Any]] = None):
+def place_market_order(
+    token,
+    lots,
+    side,
+    trading_symbol,
+    log_cb=None,
+    latency_meta: Optional[Dict[str, Any]] = None,
+    product: str = "MIS",
+    quantity: Optional[int] = None,
+):
     client = ensure_login(log_cb, latency_meta=latency_meta)
 
     trading_symbol = resolve_trading_symbol(trading_symbol, log_cb=log_cb) or str(trading_symbol).strip().upper()
@@ -72,14 +81,18 @@ def place_market_order(token, lots, side, trading_symbol, log_cb=None, latency_m
         if lot_size != 1:
             log_with_callback(log_cb, f"⚠️ Scrip master lot size not found. Using 2026 default for {s}: {lot_size}")
 
-    qty = int(lots) * lot_size
+    if quantity is not None and int(quantity) > 0:
+        qty = int(quantity)
+    else:
+        qty = int(lots) * lot_size
 
-    log_with_callback(log_cb, f"Placing {side} market order for {qty} of {trading_symbol} ({exchange_segment})")
+    prod = str(product or "MIS").upper()
+    log_with_callback(log_cb, f"Placing {side} ({prod}) market order for {qty} of {trading_symbol} ({exchange_segment})")
 
     try:
         resp = client.place_order(
             exchange_segment=exchange_segment,
-            product="MIS",
+            product=prod,
             price="0",
             order_type="MKT",
             quantity=str(qty),

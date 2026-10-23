@@ -112,14 +112,22 @@ class PnLEngine:
 # API Adapter
 # =========================
 _FILLED_STATUSES = frozenset(
-    {"complete", "completed", "filled", "traded", "executed"}
+    {"complete", "completed", "filled", "traded", "executed", "trad", "closed"}
 )
 
 _TIMESTAMP_FORMATS = (
     "%d-%b-%Y %H:%M:%S",
+    "%d-%b-%Y %I:%M:%S %p",
+    "%d/%m/%Y %H:%M:%S",
+    "%d/%m/%Y %I:%M:%S %p",
+    "%d-%m-%Y %H:%M:%S",
+    "%d-%m-%Y %I:%M:%S %p",
     "%Y/%m/%d %H:%M:%S",
     "%Y-%m-%d %H:%M:%S",
     "%Y-%m-%d %H:%M:%S.%f",
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%dT%H:%M:%S.%f",
+    "%H:%M:%S",
 )
 
 
@@ -165,7 +173,11 @@ def _parse_trade_timestamp(o: dict) -> datetime:
         ts = " ".join(ts_raw.split())
         for fmt in _TIMESTAMP_FORMATS:
             try:
-                return datetime.strptime(ts, fmt)
+                parsed = datetime.strptime(ts, fmt)
+                if fmt == "%H:%M:%S":
+                    today = datetime.now().date()
+                    parsed = datetime.combine(today, parsed.time())
+                return parsed
             except ValueError:
                 continue
     return datetime.now()
@@ -225,30 +237,21 @@ def _parse_avg_price(o: dict) -> float:
 
 
 def _parse_trade_qty(o: dict, *, fills: bool = False) -> int:
-    if fills:
-        q_val = (
-            o.get("fldQty")
-            or o.get("executionQty")
-            or o.get("filledQty")
-            or o.get("flQty")
-            or o.get("qty")
-            or 0
-        )
-    else:
-        q_val = (
-            o.get("fldQty")
-            or o.get("flQty")
-            or o.get("executionQty")
-            or o.get("filledQty")
-            or o.get("qty")
-            or o.get("flBuyQty")
-            or o.get("flSellQty")
-            or 0
-        )
-    try:
-        return int(float(str(q_val)))
-    except (TypeError, ValueError):
-        return 0
+    keys = (
+        ("fldQty", "executionQty", "filledQty", "flQty", "qty")
+        if fills
+        else ("fldQty", "flQty", "executionQty", "filledQty", "qty", "flBuyQty", "flSellQty")
+    )
+    for k in keys:
+        val = o.get(k)
+        if val is not None and str(val).strip() != "":
+            try:
+                q = int(float(str(val)))
+                if q > 0:
+                    return q
+            except (TypeError, ValueError):
+                continue
+    return 0
 
 
 def _row_to_trade(o: dict, *, fills: bool = False) -> Optional[Trade]:
@@ -383,12 +386,13 @@ class PositionPnLEngine:
         return round((net_pnl / self.initial_capital) * 100, 2)
 
     def add_trade(self, trade: Trade):
-        symbol = trade.symbol.strip().upper()
+        raw_symbol = str(trade.symbol or "").strip().upper()
+        symbol = raw_symbol.replace(" ", "")
 
         # BUY opens or adds to a position (per symbol)
         if trade.side == "B":
             self.open_trades[symbol].append({
-                "symbol": symbol,
+                "symbol": raw_symbol,
                 "buy_price": trade.price,
                 "buy_qty": trade.qty,
                 "open_qty": trade.qty,
@@ -400,54 +404,61 @@ class PositionPnLEngine:
             })
 
         # SELL reduces position using FIFO
-        elif trade.side == "S" and self.open_trades.get(symbol):
-            sell_qty = trade.qty
-            
-            while sell_qty > 0 and self.open_trades[symbol]:
-                pos = self.open_trades[symbol][0]
-                matched_qty = min(sell_qty, pos["open_qty"])
+        elif trade.side == "S":
+            target_symbol = symbol if self.open_trades.get(symbol) else None
+            if not target_symbol:
+                for open_sym in list(self.open_trades.keys()):
+                    if open_sym == raw_symbol or open_sym.replace(" ", "") == symbol:
+                        target_symbol = open_sym
+                        break
+                if not target_symbol and len(self.open_trades) == 1:
+                    only_sym = next(iter(self.open_trades.keys()))
+                    for base in ("NIFTY", "SENSEX", "BANKNIFTY", "FINNIFTY", "BANKEX"):
+                        if base in symbol and base in only_sym:
+                            target_symbol = only_sym
+                            break
 
-                # Brokerage logic: Flat 10 if order source is Broker Website (TFC_W)
-                # Note: We apply brokerage on the MATCHED lot. 
-                # If either the Buy OR the Sell was from Web, we apply it? 
-                # Usually brokerage is per order. Let's assume 10 if the Sell was from Web for now, 
-                # or check both.
+            if target_symbol and self.open_trades.get(target_symbol):
+                sell_qty = trade.qty
                 
-                brokerage = 0.0
-                # If source is NOT our terminal (NEOTRADEAPI), apply 10 point brokerage
-                # 'trade' is the Sell, 'pos' is the matching Buy
-                sell_src = trade.order_source
-                buy_src = pos.get("order_source", "NA")
+                while sell_qty > 0 and self.open_trades[target_symbol]:
+                    pos = self.open_trades[target_symbol][0]
+                    matched_qty = min(sell_qty, pos["open_qty"])
 
-                if sell_src != "NA" and "NEOTRADEAPI" not in sell_src:
-                    brokerage += 10.0
-                if buy_src != "NA" and "NEOTRADEAPI" not in buy_src:
-                    brokerage += 10.0
+                    # Brokerage logic: Flat 10 if order source is Broker Website (TFC_W)
+                    brokerage = 0.0
+                    # If source is NOT our terminal (NEOTRADEAPI), apply 10 point brokerage
+                    sell_src = trade.order_source
+                    buy_src = pos.get("order_source", "NA")
 
-                pnl = (trade.price - pos["buy_price"]) * matched_qty
-                turnover = (trade.price + pos["buy_price"]) * matched_qty
-                charges = ChargesCalculator.calculate(turnover, trade.segment, brokerage=brokerage)
+                    if sell_src != "NA" and "NEOTRADEAPI" not in sell_src:
+                        brokerage += 10.0
+                    if buy_src != "NA" and "NEOTRADEAPI" not in buy_src:
+                        brokerage += 10.0
 
-                pos["gross_pnl"] += pnl
-                pos["charges"] += charges
-                pos["open_qty"] -= matched_qty
-                sell_qty -= matched_qty
+                    pnl = (trade.price - pos["buy_price"]) * matched_qty
+                    turnover = (trade.price + pos["buy_price"]) * matched_qty
+                    charges = ChargesCalculator.calculate(turnover, trade.segment, brokerage=brokerage)
 
-                # Position fully closed for this buy lot
-                if pos["open_qty"] == 0:
-                    pos["net_pnl"] = round(pos["gross_pnl"] - pos["charges"], 2)
-                    pos["sell_price"] = trade.price
-                    pos["sell_time"] = trade.time
-                    pos["sell_order_id"] = trade.order_id
-                    pos["sell_order_source"] = trade.order_source # Carry order_source for sell
-                    pos["trade_date"] = trade.time.date()
+                    pos["gross_pnl"] += pnl
+                    pos["charges"] += charges
+                    pos["open_qty"] -= matched_qty
+                    sell_qty -= matched_qty
 
-                    self.completed_trades.append(pos)
-                    self.open_trades[symbol].popleft()
-                    #print(f"DEBUG: Trade Completed - {symbol} PnL: {pos['net_pnl']} [B:{pos['buy_order_id']} S:{pos['sell_order_id']}]")
-            
-            if not self.open_trades[symbol]:
-                del self.open_trades[symbol]
+                    # Position fully closed for this buy lot
+                    if pos["open_qty"] == 0:
+                        pos["net_pnl"] = round(pos["gross_pnl"] - pos["charges"], 2)
+                        pos["sell_price"] = trade.price
+                        pos["sell_time"] = trade.time
+                        pos["sell_order_id"] = trade.order_id
+                        pos["sell_order_source"] = trade.order_source # Carry order_source for sell
+                        pos["trade_date"] = trade.time.date()
+
+                        self.completed_trades.append(pos)
+                        self.open_trades[target_symbol].popleft()
+                
+                if not self.open_trades[target_symbol]:
+                    del self.open_trades[target_symbol]
 
     def hourly_summary(self, for_date=None) -> Dict[str, int]:
         """
