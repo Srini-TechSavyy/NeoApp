@@ -126,6 +126,73 @@ class TestPnLParsing(unittest.TestCase):
         self.assertEqual(meta["source"], "trade_report")
         self.assertEqual(len(trades), 2)
 
+    def test_broker_trades_skips_trade_report_when_orders_complete(self):
+        called = {"trade_report": False}
+
+        class FakeClient:
+            def order_report(self):
+                return {
+                    "data": [
+                        {
+                            "ordSt": "complete",
+                            "trdSym": "NIFTY26SEP22800PE",
+                            "trnsTp": "B",
+                            "fldQty": 10,
+                            "avgPrc": 5.0,
+                            "exCfmTm": "28-Sep-2026 09:15:00",
+                            "exSeg": "nse_fo",
+                            "nOrdNo": "1",
+                        },
+                        {
+                            "ordSt": "complete",
+                            "trdSym": "NIFTY26SEP22800PE",
+                            "trnsTp": "S",
+                            "fldQty": 10,
+                            "avgPrc": 6.0,
+                            "exCfmTm": "28-Sep-2026 09:16:00",
+                            "exSeg": "nse_fo",
+                            "nOrdNo": "2",
+                        },
+                    ]
+                }
+
+            def trade_report(self):
+                called["trade_report"] = True
+                return {"data": []}
+
+        trades, meta = broker_trades_for_pnl(FakeClient())
+        self.assertEqual(meta["source"], "order_report")
+        self.assertEqual(len(trades), 2)
+        self.assertFalse(called["trade_report"], "trade_report should not be called when order_report has closed trades")
+
+    def test_build_monitor_snapshot_with_open_position_unrealized_pnl(self):
+        from web.shared.monitor_snapshot import build_monitor_snapshot
+
+        completed_trades = [
+            {
+                "buy_time": datetime.now(),
+                "sell_time": datetime.now(),
+                "gross_pnl": 100.0,
+                "net_pnl": 80.0,
+                "charges": 20.0,
+            }
+        ]
+        open_pos = {
+            "symbol": "NIFTY26OCT25000CE",
+            "qty": 50,
+            "entry_price": 100.0,
+            "ltp": 105.0,
+            "points": 5.0,
+            "unrealized_pnl": 250.0,
+        }
+
+        snap = build_monitor_snapshot(completed_trades, open_position=open_pos)
+        self.assertEqual(snap["pnl"]["gross"], 100.0)
+        self.assertEqual(snap["pnl"]["net"], 80.0)
+        self.assertEqual(snap["pnl"]["unrealized"], 250.0)
+        self.assertEqual(snap["pnl"]["total_gross"], 350.0)
+        self.assertEqual(snap["pnl"]["total_net"], 330.0)
+
 
 if __name__ == "__main__":
     unittest.main()

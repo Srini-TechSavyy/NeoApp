@@ -40,10 +40,16 @@ class MonitorTradeStats(BaseModel):
 
 
 class MonitorPnL(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     gross: float
     net: float
     day: float
     charges: float
+    unrealized: Optional[float] = None
+    total_gross: Optional[float] = None
+    total_net: Optional[float] = None
+    day_total: Optional[float] = None
 
 
 class MonitorSnapshotData(BaseModel):

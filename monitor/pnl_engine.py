@@ -330,6 +330,10 @@ def broker_trades_for_pnl(client) -> Tuple[List[Trade], Dict]:
     meta["parsed_order_trades"] = len(order_trades)
     meta["completed_from_orders"] = _completed_trade_count(order_trades)
 
+    if meta["completed_from_orders"] > 0:
+        meta["source"] = "order_report"
+        return order_trades, meta
+
     fill_rows: List[dict] = []
     trade_report = client.trade_report()
     if isinstance(trade_report, dict) and not (
@@ -350,9 +354,6 @@ def broker_trades_for_pnl(client) -> Tuple[List[Trade], Dict]:
     meta["parsed_fill_trades"] = len(fill_trades)
     meta["completed_from_fills"] = _completed_trade_count(fill_trades)
 
-    if meta["completed_from_orders"] > 0:
-        meta["source"] = "order_report"
-        return order_trades, meta
     if meta["completed_from_fills"] > 0:
         meta["source"] = "trade_report"
         return fill_trades, meta

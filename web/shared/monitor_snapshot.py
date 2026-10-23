@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 
 def _current_week_window() -> Tuple[datetime.date, datetime.date]:
@@ -34,7 +34,7 @@ def _filter_weekday_trades(completed_trades: List[Dict]) -> Tuple[List[Dict], da
     return weekly, monday, friday
 
 
-def build_monitor_snapshot(completed_trades: List[Dict]) -> Dict:
+def build_monitor_snapshot(completed_trades: List[Dict], open_position: Optional[Dict] = None) -> Dict:
     weekly_trades, monday, friday = _filter_weekday_trades(completed_trades)
     today = datetime.now().date()
 
@@ -53,6 +53,14 @@ def build_monitor_snapshot(completed_trades: List[Dict]) -> Dict:
         ),
         2,
     )
+
+    unrealized_pnl = 0.0
+    if open_position and isinstance(open_position, dict):
+        unrealized_pnl = round(float(open_position.get("unrealized_pnl", 0) or 0), 2)
+
+    total_gross = round(gross_pnl + unrealized_pnl, 2)
+    total_net = round(net_pnl + unrealized_pnl, 2)
+    day_total = round(day_pnl + unrealized_pnl, 2)
 
     return {
         "status": "ok",
@@ -74,5 +82,9 @@ def build_monitor_snapshot(completed_trades: List[Dict]) -> Dict:
             "net": net_pnl,
             "day": day_pnl,
             "charges": charges,
+            "unrealized": unrealized_pnl,
+            "total_gross": total_gross,
+            "total_net": total_net,
+            "day_total": day_total,
         },
     }

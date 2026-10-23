@@ -25,7 +25,8 @@ from web.shared.state_store import write_snapshot
 from web.shared.trade_orders import refresh_pending_orders
 from web.shared.trading_actions import execute_market_action
 
-POLL_SECONDS = int(os.getenv("WEB_POLL_SECONDS", "5"))
+POLL_SECONDS = float(os.getenv("WEB_POLL_SECONDS", "2"))
+FAST_POLL_SECONDS = float(os.getenv("WEB_FAST_POLL_SECONDS", "1"))
 MAX_BACKOFF_SECONDS = int(os.getenv("WEB_MAX_BACKOFF_SECONDS", "60"))
 logger = logging.getLogger("neoapp.web.worker")
 logging.basicConfig(level=os.getenv("WEB_LOG_LEVEL", "INFO"))
@@ -208,6 +209,16 @@ def _run_once(client, manager: LiveScalpingManager, runtime_state: dict):
         last_exit_time = market_time_to_epoch(st) if st is not None else 0.0
 
     open_pos = _extract_open_position(client)
+    cur_ltp = 0.0
+    if open_pos:
+        cur_ltp = _fetch_option_ltp(client, open_pos["symbol"])
+        entry = float(open_pos.get("entry_price") or 0)
+        qty = int(open_pos.get("qty") or 0)
+        points = round(cur_ltp - entry, 2) if (cur_ltp > 0 and entry > 0) else 0.0
+        unrealized = round(points * qty, 2) if (cur_ltp > 0 and entry > 0) else 0.0
+        open_pos["ltp"] = cur_ltp
+        open_pos["points"] = points
+        open_pos["unrealized_pnl"] = unrealized
 
     symbol_for_index = open_pos["symbol"] if open_pos else AUTO_BASE_INDEX
     idx_ltp, _, _, idx_name = fetch_index_ltp(client, symbol_for_index)
@@ -249,7 +260,9 @@ def _run_once(client, manager: LiveScalpingManager, runtime_state: dict):
     if TRADING_ENABLED and AUTO_SELL_ENABLED and open_pos:
         symbol = open_pos["symbol"]
         entry = float(open_pos.get("entry_price") or 0)
-        cur_ltp = _fetch_option_ltp(client, symbol)
+        if cur_ltp <= 0:
+            cur_ltp = _fetch_option_ltp(client, symbol)
+            open_pos["ltp"] = cur_ltp
         if entry > 0 and cur_ltp > 0:
             profit = cur_ltp - entry
             max_seen = float(runtime_state.get("max_price_seen", entry))
@@ -285,7 +298,7 @@ def _run_once(client, manager: LiveScalpingManager, runtime_state: dict):
                 except Exception as e:
                     action_msg = f"AUTO EXIT failed: {e}"
 
-    snapshot = build_monitor_snapshot(engine.completed_trades)
+    snapshot = build_monitor_snapshot(engine.completed_trades, open_position=open_pos)
     snapshot["broker_sync"] = broker_sync
     snapshot["healthy"] = True
     snapshot["message"] = "Worker cycle completed"
@@ -306,7 +319,14 @@ def _run_once(client, manager: LiveScalpingManager, runtime_state: dict):
         "index_name": idx_name,
         "index_ltp": idx_ltp,
     }
-    snapshot["position"] = open_pos or {"symbol": None, "qty": 0, "entry_price": 0}
+    snapshot["position"] = open_pos or {
+        "symbol": None,
+        "qty": 0,
+        "entry_price": 0,
+        "ltp": 0.0,
+        "points": 0.0,
+        "unrealized_pnl": 0.0,
+    }
     snapshot["risk"] = risk
     snapshot["automation"] = auto_info
     snapshot["last_action"] = action_msg
@@ -359,7 +379,7 @@ def main():
             except Exception as relogin_exc:
                 logger.exception("Worker relogin after session reset failed: %s", relogin_exc)
         try:
-            _run_once(client, manager, runtime_state)
+            snapshot = _run_once(client, manager, runtime_state)
             consecutive_failures = 0
             last_success_at = _now()
             logger.info("Worker cycle success")
@@ -391,7 +411,9 @@ def main():
             continue
 
         elapsed = time.time() - cycle_started
-        sleep_for = max(POLL_SECONDS - elapsed, 0)
+        is_in_position = bool(snapshot.get("position", {}).get("symbol")) if isinstance(snapshot, dict) else False
+        target_poll = FAST_POLL_SECONDS if is_in_position else POLL_SECONDS
+        sleep_for = max(target_poll - elapsed, 0)
         time.sleep(sleep_for)
 
 

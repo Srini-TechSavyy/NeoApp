@@ -40,22 +40,41 @@ def _file_lock(path: str, shared: bool):
                 fcntl.flock(lock_f.fileno(), fcntl.LOCK_UN)
 
 
+_cached_snapshot: Dict[str, Any] = {}
+_cached_mtime_ns: int = 0
+
+
 def read_snapshot() -> Dict[str, Any]:
+    global _cached_snapshot, _cached_mtime_ns
     path = _abs_path(STATE_FILE)
     if not os.path.exists(path):
         return {}
+
+    try:
+        stat_res = os.stat(path)
+        if stat_res.st_mtime_ns == _cached_mtime_ns and _cached_snapshot:
+            return _cached_snapshot
+    except OSError:
+        pass
 
     lock_path = _lock_path(path)
     with _file_lock(lock_path, shared=True):
         try:
             with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except json.JSONDecodeError:
+                data = json.load(f)
+                _cached_snapshot = data
+                try:
+                    _cached_mtime_ns = os.stat(path).st_mtime_ns
+                except OSError:
+                    pass
+                return data
+        except (json.JSONDecodeError, OSError):
             # Corrupted/partial read should not crash API callers.
-            return {}
+            return _cached_snapshot or {}
 
 
 def write_snapshot(snapshot: Dict[str, Any]) -> None:
+    global _cached_snapshot, _cached_mtime_ns
     path = _abs_path(STATE_FILE)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     lock_path = _lock_path(path)
@@ -68,6 +87,11 @@ def write_snapshot(snapshot: Dict[str, Any]) -> None:
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(temp_path, path)
+            _cached_snapshot = snapshot
+            try:
+                _cached_mtime_ns = os.stat(path).st_mtime_ns
+            except OSError:
+                pass
         finally:
             if os.path.exists(temp_path):
                 os.remove(temp_path)

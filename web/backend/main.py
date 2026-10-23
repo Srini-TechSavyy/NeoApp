@@ -529,7 +529,7 @@ async def ws_monitor(websocket: WebSocket):
                 await websocket.send_json(payload)
                 last_hash = curr_hash
 
-            await asyncio.sleep(1)
+            await asyncio.sleep(0.5)
     except WebSocketDisconnect:
         return
     except Exception:

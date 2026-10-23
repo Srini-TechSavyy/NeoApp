@@ -1152,15 +1152,31 @@
       }
     }
 
-    function renderTopBarPnl(pnl) {
+    function renderTopBarPnl(pnl, position) {
       const actualEl = document.getElementById('topActualPnl');
       const netEl = document.getElementById('topNetPnl');
       const brokEl = document.getElementById('topBrokerage');
       if (!actualEl || !netEl || !brokEl) return;
 
       const p = pnl && typeof pnl === 'object' ? pnl : {};
-      applySignedPnlEl(actualEl, p.gross);
-      applySignedPnlEl(netEl, p.net);
+      const pos = position && typeof position === 'object' ? position : {};
+      const unrealized = Number(p.unrealized ?? pos.unrealized_pnl ?? 0);
+      const hasOpen = !!(pos.symbol && Number.isFinite(unrealized) && unrealized !== 0);
+
+      const grossVal = hasOpen && p.total_gross != null ? p.total_gross : p.gross;
+      const netVal = hasOpen && p.total_net != null ? p.total_net : p.net;
+
+      applySignedPnlEl(actualEl, grossVal);
+      applySignedPnlEl(netEl, netVal);
+
+      if (hasOpen) {
+        const uSign = unrealized >= 0 ? '+' : '';
+        actualEl.title = `Live Gross: ${grossVal} (Closed: ${p.gross ?? 0}, MTM: ${uSign}${unrealized.toFixed(2)})`;
+        netEl.title = `Live Net: ${netVal} (Closed: ${p.net ?? 0}, MTM: ${uSign}${unrealized.toFixed(2)})`;
+      } else {
+        actualEl.title = `Closed Gross PnL: ${p.gross ?? 0}`;
+        netEl.title = `Closed Net PnL: ${p.net ?? 0}`;
+      }
 
       const charges = p.charges;
       brokEl.textContent = charges === null || charges === undefined || charges === ''
@@ -1506,6 +1522,10 @@
       lines.push('-'.repeat(20));
       lines.push(`Gross PnL: ${p.gross ?? '—'}`);
       lines.push(`Net PnL  : ${p.net ?? '—'}`);
+      if (p.unrealized != null && p.unrealized !== 0) {
+        lines.push(`Unrealized: ${p.unrealized >= 0 ? '+' : ''}${p.unrealized}`);
+        lines.push(`Total Net : ${p.total_net ?? '—'}`);
+      }
       lines.push(`Day PnL  : ${p.day ?? '—'}`);
       lines.push(`Charges  : ${p.charges ?? '—'}`);
       lines.push('-'.repeat(20));
@@ -1632,7 +1652,7 @@
       }
 
       monText.textContent = buildMonitorText(data);
-      renderTopBarPnl(data.pnl);
+      renderTopBarPnl(data.pnl, data.position);
 
       const indicator = data.indicator || {};
       const risk = data.risk || {};
@@ -1666,7 +1686,14 @@
       const posEl = document.getElementById('positionLabel');
       const positionOpen = !!(position && position.symbol);
       if (positionOpen) {
-        posEl.textContent = `● POSITION OPEN — ${position.symbol} (${position.qty}) @ ${position.entry_price ?? '—'}`;
+        const ltpVal = Number(position.ltp);
+        const hasLtp = Number.isFinite(ltpVal) && ltpVal > 0;
+        const ltpStr = hasLtp ? ` | LTP: ${ltpVal.toFixed(2)}` : '';
+        const pts = Number(position.points ?? 0);
+        const ptsStr = hasLtp && position.points != null ? ` (${pts >= 0 ? '+' : ''}${pts.toFixed(2)} pts)` : '';
+        const unPnl = Number(position.unrealized_pnl ?? 0);
+        const pnlStr = hasLtp && position.unrealized_pnl != null ? ` | Live: ${unPnl >= 0 ? '+' : ''}₹${unPnl.toFixed(2)}` : '';
+        posEl.textContent = `● POSITION OPEN — ${position.symbol} (${position.qty}) @ ${position.entry_price ?? '—'}${ltpStr}${ptsStr}${pnlStr}`;
         posEl.className = 'open';
       } else {
         posEl.textContent = '● NO POSITION';
@@ -2075,21 +2102,29 @@
       };
     }
 
-    document.getElementById('connectBtn').addEventListener('click', async () => {
-      const token = tokenEl.value.trim();
-      localStorage.setItem('neo_web_token', token);
+    async function startConnection(token) {
+      const curToken = token !== undefined ? token : tokenEl.value.trim();
+      if (curToken) {
+        localStorage.setItem('neo_web_token', curToken);
+      }
       try {
-        await loadSnapshot(token);
-        await loadSystemStatus(token);
-        await loadKillSwitch(token);
-        await fetchIndexLtpForSelectedIndex({ suggestAfter: true });
-        await loadExpiryOptions();
-        connectWs(token);
+        connectWs(curToken);
+        await Promise.allSettled([
+          loadSnapshot(curToken),
+          loadSystemStatus(curToken),
+          loadKillSwitch(curToken),
+          fetchIndexLtpForSelectedIndex({ suggestAfter: true }),
+          loadExpiryOptions(),
+        ]);
       } catch (e) {
         setStatus(String(e.message || e), 'red');
         setMessage('Connection failed. Check token and worker status.', 'red');
         setConnStatus(false);
       }
+    }
+
+    document.getElementById('connectBtn').addEventListener('click', () => {
+      startConnection(tokenEl.value.trim());
     });
 
     const killSwitchToggle = document.getElementById('killSwitchToggle');
@@ -2170,6 +2205,9 @@
     updateSummaryLtpLabel(getSelectedBaseIndex());
     syncOptionTypeButtons();
     syncExpiryFromSymbol();
+
+    // Auto-connect on page load
+    startConnection(saved);
 
     (function startTopClock() {
       const el = document.getElementById('topClock');
