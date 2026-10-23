@@ -41,6 +41,8 @@ def build_monitor_snapshot(completed_trades: List[Dict], open_position: Optional
     pnls = [round(t.get("net_pnl", 0)) for t in weekly_trades]
     wins = sum(1 for p in pnls if p > 0)
     losses = sum(1 for p in pnls if p < 0)
+    recent_pnls = pnls[-5:]
+    streak = ["P" if p > 0 else ("L" if p < 0 else "BE") for p in recent_pnls]
 
     gross_pnl = round(sum(t.get("gross_pnl", 0) for t in weekly_trades), 2)
     net_pnl = round(sum(t.get("net_pnl", 0) for t in weekly_trades), 2)
@@ -75,7 +77,8 @@ def build_monitor_snapshot(completed_trades: List[Dict], open_position: Optional
             "wins": wins,
             "losses": losses,
             "win_rate": round((wins / len(pnls)) * 100, 2) if pnls else 0.0,
-            "recent": pnls[-5:],
+            "recent": recent_pnls,
+            "streak": streak,
         },
         "pnl": {
             "gross": gross_pnl,

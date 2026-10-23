@@ -11,7 +11,7 @@ import os
 # Allow importing from parent directory
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from common.config import DEFAULT_TRADING_SYMBOL, BUY_DISABLE_DURATION, BUY_DISABLE_LOSS_COUNT, BUY_DISABLE_MAX_LOSS, BUY_DISABLE_MAX_PROFIT, PROGRESSIVE_LOSS_CONFIG, PROGRESSIVE_LOSS_CONFIG_DEFAULT, REFRESH_INTERVAL_MS, DEFAULT_TARGET, DEFAULT_SL, DEFAULT_TSL_STEP, DEFAULT_TP_TSL, COOL_OFF_PERIOD, TELEGRAM_COOL_OFF, REMOTE_CONFIG_URL, PROGRESSIVE_LOSS_URL, NIFTY_CONFIG, SENSEX_CONFIG, INITIAL_CAPITAL, CAPITAL_HISTORY_FILE, CAPITAL_TOPUP, PNL_RESET_DATE, MAX_DAILY_LOSS_COUNT, RSIM_RSI_UP, RSIM_RSI_DOWN, RSIM_SUSTAIN_TICKS, get_next_expiry
+from common.config import DEFAULT_TRADING_SYMBOL, BUY_DISABLE_DURATION, BUY_DISABLE_LOSS_COUNT, BUY_DISABLE_MAX_LOSS, BUY_DISABLE_MAX_PROFIT, PROGRESSIVE_LOSS_CONFIG, PROGRESSIVE_LOSS_CONFIG_DEFAULT, REFRESH_INTERVAL_MS, DEFAULT_TARGET, DEFAULT_SL, DEFAULT_TSL_STEP, DEFAULT_TP_TSL, COOL_OFF_PERIOD, TELEGRAM_COOL_OFF, REMOTE_CONFIG_URL, PROGRESSIVE_LOSS_URL, NIFTY_CONFIG, SENSEX_CONFIG, INITIAL_CAPITAL, CAPITAL_HISTORY_FILE, CAPITAL_TOPUP, PNL_RESET_DATE, MAX_DAILY_LOSS_COUNT, RSIM_RSI_UP, RSIM_RSI_DOWN, RSIM_SUSTAIN_TICKS, get_next_expiry, ENABLE_BUY_DISABLE
 from common.utils import log_with_callback, run_bg, fetch_remote_config, fetch_remote_json, get_resource_path, send_telegram_msg
 from common.scrip_master import load_scrip_master_csv, find_token_for_trading_symbol
 from common.orders import ensure_login as do_login, place_market_order, get_client, detect_exchange_segment, detect_strike_step
@@ -686,6 +686,8 @@ momentum_alert_label.pack(side="right", padx=(0, 20))
 
 
 def is_buy_disabled():
+    if not ENABLE_BUY_DISABLE:
+        return False, 0, None
 
     if os.path.exists(BUY_DISABLED_FILE):
         try:
@@ -1635,6 +1637,8 @@ def update_monitor_ui():
             update_monitor_ui.last_config_refresh = time.time()
 
 def process_buy_disable_logic(engine):
+    if not ENABLE_BUY_DISABLE:
+        return
     # 1. Daily Stats
     completed = engine.completed_trades
     net_pnl = sum(t.get("net_pnl", 0) for t in completed)

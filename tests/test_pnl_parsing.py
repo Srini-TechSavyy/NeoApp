@@ -192,6 +192,8 @@ class TestPnLParsing(unittest.TestCase):
         self.assertEqual(snap["pnl"]["unrealized"], 250.0)
         self.assertEqual(snap["pnl"]["total_gross"], 350.0)
         self.assertEqual(snap["pnl"]["total_net"], 330.0)
+        self.assertEqual(snap["trade_stats"]["streak"], ["P"])
+        self.assertEqual(snap["trade_stats"]["recent"], [80])
 
 
 if __name__ == "__main__":

@@ -37,6 +37,8 @@ class MonitorTradeStats(BaseModel):
     losses: int
     win_rate: float
     recent: List[int]
+    streak: Optional[List[str]] = None
+
 
 
 class MonitorPnL(BaseModel):

@@ -450,6 +450,56 @@
     #positionLabel { font-weight: 750; }
     #positionLabel.open { color: var(--exit); }
     #positionLabel.flat { color: var(--muted); }
+    .trade-streak {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .trade-streak-lbl {
+      color: var(--muted);
+      font-weight: 650;
+      margin-right: 2px;
+    }
+    .streak-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 4px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+      cursor: default;
+      transition: transform 0.1s ease;
+    }
+    .streak-badge:hover {
+      transform: scale(1.12);
+    }
+    .streak-badge.streak-p {
+      background: #dcfce7;
+      color: #15803d;
+      border: 1px solid #86efac;
+    }
+    .streak-badge.streak-l {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+    }
+    .streak-badge.streak-flat {
+      background: #f1f5f9;
+      color: #64748b;
+      border: 1px solid #cbd5e1;
+    }
+    .streak-sep {
+      color: var(--muted);
+      font-weight: 400;
+      margin-right: 2px;
+    }
     #strategyLabel {
       margin-left: auto;
       font-weight: 700;
@@ -782,6 +832,7 @@
         <div class="status-bar">
           <span id="buyStatusLabel">Buy status: —</span>
           <span id="positionLabel" class="flat">● NO POSITION</span>
+          <span id="tradeStreak" class="trade-streak" title="Streak of last 5 trades (oldest → newest)"><span class="trade-streak-lbl">Streak:</span> <span class="muted">—</span></span>
           <span id="momentumAlert"></span>
           <span id="strategyLabel">Strategy: —</span>
         </div>
@@ -1544,6 +1595,12 @@
       const recent = (s.recent || []).join(' | ');
       lines.push(`Recent: ${recent || '—'}`);
 
+      let streak = Array.isArray(s.streak) ? s.streak : null;
+      if (!streak && Array.isArray(s.recent) && s.recent.length) {
+        streak = s.recent.map(p => (Number(p) > 0 ? 'P' : (Number(p) < 0 ? 'L' : 'BE')));
+      }
+      lines.push(`Streak: ${streak && streak.length ? streak.join(', ') : '—'}`);
+
       lines.push('-'.repeat(20));
       lines.push('Avg/hr    : — (not in web snapshot)');
 
@@ -1624,11 +1681,45 @@
       syncTradeButtons();
     }
 
+    function renderTradeStreak(stats) {
+      const el = document.getElementById('tradeStreak');
+      if (!el) return;
+      const s = stats && typeof stats === 'object' ? stats : {};
+      let streak = Array.isArray(s.streak) ? s.streak : null;
+      const recent = Array.isArray(s.recent) ? s.recent : [];
+
+      if (!streak && recent.length) {
+        streak = recent.map(p => (Number(p) > 0 ? 'P' : (Number(p) < 0 ? 'L' : 'BE')));
+      }
+
+      if (!streak || streak.length === 0) {
+        el.innerHTML = '<span class="trade-streak-lbl">Streak:</span> <span class="muted">—</span>';
+        return;
+      }
+
+      const itemsHtml = streak.map((letter, idx) => {
+        const pnl = recent[idx];
+        const isP = letter === 'P';
+        const isL = letter === 'L';
+        const cls = isP ? 'streak-p' : (isL ? 'streak-l' : 'streak-flat');
+        const num = Number(pnl);
+        let titleAttr = '';
+        if (Number.isFinite(num)) {
+          const sign = num > 0 ? '+' : '';
+          titleAttr = ` title="Trade ${idx + 1}: ${sign}₹${num}"`;
+        }
+        return `<span class="streak-badge ${cls}"${titleAttr}>${letter}</span>`;
+      }).join('<span class="streak-sep">, </span>');
+
+      el.innerHTML = `<span class="trade-streak-lbl">Streak:</span> ${itemsHtml}`;
+    }
+
     function render(payload) {
       if (payload && payload.warming_up && !payload.data) {
         setMessage(payload.message || 'Worker is warming up…', 'muted');
         monText.textContent = payload.message || 'Waiting for worker snapshot…';
         renderTopBarPnl(null);
+        renderTradeStreak(null);
         setConnStatus(false);
         return;
       }
@@ -1653,6 +1744,7 @@
 
       monText.textContent = buildMonitorText(data);
       renderTopBarPnl(data.pnl, data.position);
+      renderTradeStreak(data.trade_stats);
 
       const indicator = data.indicator || {};
       const risk = data.risk || {};

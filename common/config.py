@@ -82,7 +82,8 @@ def get_next_expiry(symbol: str) -> str:
 # Buy disable feature
 BUY_DISABLE_LOSS_COUNT = 3  # Number of continuous losses to disable buying
 BUY_DISABLE_DURATION = 120  # seconds
-ENABLE_BUY_DISABLE = True   # Enable/Disable the lockout feature
+ENABLE_BUY_DISABLE = os.getenv("ENABLE_BUY_DISABLE", "false").strip().lower() in ("true", "1", "yes")   # Default disabled: risk lockout feature disabled
+
 
 # Progressive Loss Lockout (Loss amount, Duration in minutes)
 # Once a threshold is hit, buying is disabled for the specified duration.

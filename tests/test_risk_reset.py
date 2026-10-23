@@ -85,3 +85,34 @@ def test_broker_session_reset_flag_roundtrip(reset_flag_path):
     assert broker_session_reset.consume_broker_session_reset_request() is True
     assert broker_session_reset.consume_broker_session_reset_request() is False
     assert not reset_flag_path.is_file()
+
+
+def test_evaluate_risk_state_disabled_by_default(monkeypatch, buy_disabled_path):
+    from datetime import datetime
+
+    today = datetime.now()
+    trades = [
+        {"sell_time": today, "net_pnl": -3000},
+        {"sell_time": today, "net_pnl": -1000},
+    ]
+    # By default ENABLE_BUY_DISABLE is False
+    risk = risk_controls.evaluate_risk_state(trades)
+    assert risk["buy_allowed"] is True
+    assert risk["locked"] is False
+    assert risk["reason"] == ""
+    assert risk["disabled_until"] == 0
+
+
+def test_evaluate_risk_state_when_enabled(monkeypatch, buy_disabled_path):
+    from datetime import datetime
+
+    today = datetime.now()
+    trades = [
+        {"sell_time": today, "net_pnl": -3000},
+    ]
+    monkeypatch.setattr(risk_controls, "ENABLE_BUY_DISABLE", True)
+    risk = risk_controls.evaluate_risk_state(trades)
+    assert risk["buy_allowed"] is False
+    assert risk["locked"] is True
+    assert "max_loss" in risk["reason"]
+
