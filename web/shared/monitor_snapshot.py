@@ -1,9 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 
 
-def _current_week_window() -> Tuple[datetime.date, datetime.date]:
-    today = datetime.now().date()
+def _current_week_window(today: Optional[date] = None) -> Tuple[date, date]:
+    if today is None:
+        today = datetime.now().date()
     monday = today - timedelta(days=today.weekday())
     friday = monday + timedelta(days=4)
     return monday, friday
@@ -13,15 +14,41 @@ def _trade_time(trade: Dict):
     return trade.get("sell_time") or trade.get("buy_time")
 
 
-def _trade_date(trade: Dict):
+def _trade_date(trade: Dict) -> Optional[date]:
+    td = trade.get("trade_date")
+    if isinstance(td, datetime):
+        return td.date()
+    if isinstance(td, date):
+        return td
+    if isinstance(td, str):
+        try:
+            return datetime.fromisoformat(td).date()
+        except ValueError:
+            pass
+
     t = _trade_time(trade)
-    if not t or not hasattr(t, "date"):
+    if not t:
         return None
-    return t.date()
+    if isinstance(t, datetime):
+        return t.date()
+    if isinstance(t, date):
+        return t
+    if isinstance(t, str):
+        try:
+            return datetime.fromisoformat(t).date()
+        except ValueError:
+            pass
+    if hasattr(t, "date"):
+        return t.date()
+    return None
 
 
-def _filter_weekday_trades(completed_trades: List[Dict]) -> Tuple[List[Dict], datetime.date, datetime.date]:
-    monday, friday = _current_week_window()
+def _filter_weekday_trades(
+    completed_trades: List[Dict], today: Optional[date] = None
+) -> Tuple[List[Dict], date, date]:
+    if today is None:
+        today = datetime.now().date()
+    monday, friday = _current_week_window(today)
     weekly = []
 
     for trade in completed_trades:
@@ -34,15 +61,34 @@ def _filter_weekday_trades(completed_trades: List[Dict]) -> Tuple[List[Dict], da
     return weekly, monday, friday
 
 
-def build_monitor_snapshot(completed_trades: List[Dict], open_position: Optional[Dict] = None) -> Dict:
-    weekly_trades, monday, friday = _filter_weekday_trades(completed_trades)
-    today = datetime.now().date()
+def build_monitor_snapshot(
+    completed_trades: List[Dict],
+    open_position: Optional[Dict] = None,
+    for_date: Optional[date] = None,
+) -> Dict:
+    today = for_date if for_date is not None else datetime.now().date()
+    weekly_trades, monday, friday = _filter_weekday_trades(completed_trades, today)
 
     pnls = [round(t.get("net_pnl", 0)) for t in weekly_trades]
     wins = sum(1 for p in pnls if p > 0)
     losses = sum(1 for p in pnls if p < 0)
     recent_pnls = pnls[-5:]
     streak = ["P" if p > 0 else ("L" if p < 0 else "BE") for p in recent_pnls]
+
+    # Daily trading performance (counts strictly completed trades on the current exchange trading date)
+    today_trades = [t for t in completed_trades if _trade_date(t) == today]
+    today_wins = 0
+    today_losses = 0
+    today_break_even = 0
+    for t in today_trades:
+        net = round(float(t.get("net_pnl", 0) or 0), 2)
+        if net > 0:
+            today_wins += 1
+        elif net < 0:
+            today_losses += 1
+        else:
+            today_break_even += 1
+    today_total = today_wins + today_losses + today_break_even
 
     gross_pnl = round(sum(t.get("gross_pnl", 0) for t in weekly_trades), 2)
     net_pnl = round(sum(t.get("net_pnl", 0) for t in weekly_trades), 2)
@@ -79,6 +125,16 @@ def build_monitor_snapshot(completed_trades: List[Dict], open_position: Optional
             "win_rate": round((wins / len(pnls)) * 100, 2) if pnls else 0.0,
             "recent": recent_pnls,
             "streak": streak,
+            "today_wins": today_wins,
+            "today_losses": today_losses,
+            "today_break_even": today_break_even,
+            "today_total": today_total,
+        },
+        "today_trade_stats": {
+            "wins": today_wins,
+            "losses": today_losses,
+            "break_even": today_break_even,
+            "total_trades": today_total,
         },
         "pnl": {
             "gross": gross_pnl,

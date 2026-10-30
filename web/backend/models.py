@@ -32,13 +32,27 @@ class MonitorPeriod(BaseModel):
 
 
 class MonitorTradeStats(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     no_of_trades: int
     wins: int
     losses: int
     win_rate: float
     recent: List[int]
     streak: Optional[List[str]] = None
+    today_wins: Optional[int] = 0
+    today_losses: Optional[int] = 0
+    today_break_even: Optional[int] = 0
+    today_total: Optional[int] = 0
 
+
+class DailyTradeStats(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    wins: int = 0
+    losses: int = 0
+    break_even: int = 0
+    total_trades: int = 0
 
 
 class MonitorPnL(BaseModel):
@@ -61,6 +75,7 @@ class MonitorSnapshotData(BaseModel):
     timestamp: str
     period: Optional[MonitorPeriod] = None
     trade_stats: Optional[MonitorTradeStats] = None
+    today_trade_stats: Optional[DailyTradeStats] = None
     pnl: Optional[MonitorPnL] = None
     source: Optional[str] = None
     healthy: Optional[bool] = None

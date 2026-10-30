@@ -160,6 +160,65 @@
     #topBrokerage { font: inherit; color: var(--navy); }
     #topIndexLtp { font: inherit; }
 
+    .perf-summary-wrap {
+      margin: 0 0 6px;
+    }
+    .perf-section-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin: 2px 0 4px 2px;
+      line-height: 1.2;
+    }
+    .perf-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .perf-card {
+      padding: 6px 10px;
+      border-right: 1px solid var(--border);
+      min-width: 0;
+      text-align: center;
+    }
+    .perf-card:last-child {
+      border-right: none;
+    }
+    .perf-lbl {
+      display: block;
+      font-size: 10px;
+      font-weight: 650;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .perf-val {
+      display: block;
+      font-size: 18px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.15;
+    }
+    .perf-val-wins {
+      color: var(--buy);
+    }
+    .perf-val-losses {
+      color: var(--exit);
+    }
+    .perf-val-total {
+      color: var(--navy);
+    }
+
     .main-container {
       padding: 0 10px 10px;
       max-width: 640px;
@@ -729,6 +788,8 @@
 
     @media (max-width: 360px) {
       .pnl-val { font-size: 13px; }
+      .perf-val { font-size: 15px; }
+      .perf-card { padding: 5px 4px; }
     }
   </style>
 </head>
@@ -763,6 +824,24 @@
         <span class="pnl-val" id="topBrokerage">—</span>
       </div>
     </div>
+
+    <section class="perf-summary-wrap" aria-label="Today's Trading Performance">
+      <div class="perf-section-title">Today's Trading Performance</div>
+      <div class="perf-cards-grid">
+        <div class="perf-card perf-card-wins">
+          <span class="perf-lbl">Wins</span>
+          <span class="perf-val perf-val-wins" id="todayWins">0</span>
+        </div>
+        <div class="perf-card perf-card-losses">
+          <span class="perf-lbl">Losses</span>
+          <span class="perf-val perf-val-losses" id="todayLosses">0</span>
+        </div>
+        <div class="perf-card perf-card-total" id="todayTotalCard" title="Total completed trades today">
+          <span class="perf-lbl">Total Trades</span>
+          <span class="perf-val perf-val-total" id="todayTotalTrades">0</span>
+        </div>
+      </div>
+    </section>
 
     <section class="scalper-panel">
       <div class="form-grid">
@@ -1571,6 +1650,9 @@
       lines.push(`Trades: ${s.no_of_trades ?? '—'}`);
       const wr = s.win_rate != null ? `${s.win_rate}%` : '—';
       lines.push(`W/L   : ${s.wins ?? '—'}/${s.losses ?? '—'} (${wr})`);
+      if (s.today_total != null) {
+        lines.push(`Today : ${s.today_wins ?? 0}W / ${s.today_losses ?? 0}L (${s.today_total} trades)`);
+      }
       lines.push('-'.repeat(20));
       lines.push(`Gross PnL: ${p.gross ?? '—'}`);
       lines.push(`Net PnL  : ${p.net ?? '—'}`);
@@ -1715,11 +1797,48 @@
       el.innerHTML = `<span class="trade-streak-lbl">Streak:</span> ${itemsHtml}`;
     }
 
+    function renderTodayPerformance(stats, todayStats) {
+      const winsEl = document.getElementById('todayWins');
+      const lossesEl = document.getElementById('todayLosses');
+      const totalEl = document.getElementById('todayTotalTrades');
+      const totalCard = document.getElementById('todayTotalCard');
+      if (!winsEl || !lossesEl || !totalEl) return;
+
+      if (!stats && !todayStats) {
+        winsEl.textContent = '0';
+        lossesEl.textContent = '0';
+        totalEl.textContent = '0';
+        if (totalCard) totalCard.title = 'Total completed trades today';
+        return;
+      }
+
+      const s = todayStats || {};
+      const fallback = stats || {};
+
+      const wins = s.wins != null ? s.wins : (fallback.today_wins ?? 0);
+      const losses = s.losses != null ? s.losses : (fallback.today_losses ?? 0);
+      const breakEven = s.break_even != null ? s.break_even : (fallback.today_break_even ?? 0);
+      const total = s.total_trades != null ? s.total_trades : (fallback.today_total ?? (wins + losses + breakEven));
+
+      winsEl.textContent = String(wins);
+      lossesEl.textContent = String(losses);
+      totalEl.textContent = String(total);
+
+      if (totalCard) {
+        if (breakEven > 0) {
+          totalCard.title = `Total completed trades today: ${total} (Wins: ${wins}, Losses: ${losses}, Break-even: ${breakEven})`;
+        } else {
+          totalCard.title = `Total completed trades today: ${total} (Wins: ${wins}, Losses: ${losses})`;
+        }
+      }
+    }
+
     function render(payload) {
       if (payload && payload.warming_up && !payload.data) {
         setMessage(payload.message || 'Worker is warming up…', 'muted');
         monText.textContent = payload.message || 'Waiting for worker snapshot…';
         renderTopBarPnl(null);
+        renderTodayPerformance(null, null);
         renderTradeStreak(null);
         setConnStatus(false);
         return;
@@ -1745,6 +1864,7 @@
 
       monText.textContent = buildMonitorText(data);
       renderTopBarPnl(data.pnl, data.position);
+      renderTodayPerformance(data.trade_stats, data.today_trade_stats);
       renderTradeStreak(data.trade_stats);
 
       const indicator = data.indicator || {};
