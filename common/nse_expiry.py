@@ -41,8 +41,16 @@ def effective_expiry_date(nominal: date) -> date:
     return previous_trading_day(nominal)
 
 
+def is_effective_monthly_nifty_expiry(expiry_date: date) -> bool:
+    """True when the date is the tradeable monthly NIFTY expiry (incl. holiday prepone)."""
+    nominal = nominal_monthly_expiry(expiry_date.year, expiry_date.month)
+    return effective_expiry_date(nominal) == expiry_date
+
+
 def expiry_date_to_token(expiry_date: date) -> str:
     """Kotak/NSE F&O trading symbol expiry segment for the effective expiry date."""
+    if is_effective_monthly_nifty_expiry(expiry_date):
+        return expiry_date.strftime("%y%b").upper()
     dt = datetime(expiry_date.year, expiry_date.month, expiry_date.day)
     return _format_neo_expiry(dt)
 

@@ -4,7 +4,7 @@ import re
 import pandas as pd
 from typing import Any, Dict, List, Optional, Tuple
 import time
-from datetime import datetime
+from datetime import date, datetime
 from .utils import log_with_callback
 from .config import NSE_SCRIP_MASTER_PATH, BSE_SCRIP_MASTER_PATH
 import requests
@@ -194,21 +194,48 @@ def _normalize_weekly_expiry(expiry: str) -> str:
     return e
 
 
+def _expiry_token_effective_date(token: str) -> Optional[date]:
+    """Map a NIFTY expiry code from the instrument master to its tradeable calendar date."""
+    from common.nse_expiry import effective_expiry_date, nominal_monthly_expiry
+
+    e = _normalize_weekly_expiry(str(token).strip().upper())
+    try:
+        if len(e) == 5 and e[2:].isalpha():
+            yy = 2000 + int(e[:2])
+            mm = datetime.strptime(e[2:], "%b").month
+            return effective_expiry_date(nominal_monthly_expiry(yy, mm))
+        if len(e) == 5 and e[2] in "123456789OND":
+            yy = 2000 + int(e[:2])
+            month_ch = e[2]
+            if month_ch in _MONTH_LETTER_TO_NUM:
+                mm = _MONTH_LETTER_TO_NUM[month_ch]
+            else:
+                mm = int(month_ch)
+            dd = int(e[3:5])
+            nominal = date(yy, mm, dd)
+            return effective_expiry_date(nominal)
+    except Exception:
+        pass
+    return None
+
+
 def _expiry_tokens_equivalent(requested: str, actual: str) -> bool:
     a = _normalize_weekly_expiry(str(requested).strip().upper())
     b = _normalize_weekly_expiry(str(actual).strip().upper())
-    return a == b or requested.strip().upper() == actual.strip().upper()
+    if a == b or requested.strip().upper() == actual.strip().upper():
+        return True
+    req_d = _expiry_token_effective_date(requested)
+    act_d = _expiry_token_effective_date(actual)
+    return req_d is not None and req_d == act_d
 
 
 def _expiry_sort_key(expiry: str) -> tuple:
     """Rough chronological key for weekly/monthly expiry codes."""
+    eff = _expiry_token_effective_date(expiry)
+    if eff is not None:
+        return (eff.year, eff.month, eff.day)
     e = _normalize_weekly_expiry(expiry)
     try:
-        if len(e) == 5 and e[2:].isalpha():
-            # Monthly YYMMM (e.g. 26OCT) — before weekly branch (O/N/D are month letters too)
-            yy = 2000 + int(e[:2])
-            mm = datetime.strptime(e[2:], "%b").month
-            return (yy, mm, 28)
         if len(e) == 5 and e[2] in "123456789OND":
             yy = 2000 + int(e[:2])
             month_ch = e[2]
@@ -326,6 +353,8 @@ def list_valid_nifty_expiries(from_date=None) -> List[str]:
     theoretical = set(theoretical_expiry_tokens(today, limit=32))
     valid = [t for t in theoretical if t in master]
     valid = [t for t in valid if _expiry_sort_key(t) >= today_key]
+    if not valid:
+        valid = [t for t in list_master_expiry_tokens("NIFTY") if _expiry_sort_key(t) >= today_key]
     return sorted(valid, key=_expiry_sort_key)
 
 

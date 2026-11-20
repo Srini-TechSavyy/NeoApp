@@ -1,8 +1,9 @@
+import os
 import unittest
-from datetime import datetime
+from datetime import date, datetime
 from unittest.mock import patch
 
-from common.config import get_next_expiry, _format_neo_expiry
+from common.config import get_next_expiry, _format_neo_expiry, NSE_SCRIP_MASTER_PATH
 from common import scrip_master
 from web.shared.symbol_helpers import parse_symbol_parts, suggest_option_symbol
 
@@ -41,6 +42,19 @@ class ExpirySymbolTests(unittest.TestCase):
     def test_nifty_monthly_expiry_uses_month_name(self):
         # Wed 23 Sep 2026 → Tue 29 Sep, last Tuesday of the month.
         self.assertEqual(self._expiry(datetime(2026, 9, 23, 14, 51), "NIFTY"), "26SEP")
+
+    def test_nifty_suggest_uses_26nov_not_26d01(self):
+        if not os.path.exists(NSE_SCRIP_MASTER_PATH):
+            self.skipTest("nse_fo.csv not present")
+        scrip_master._token_cache = {}
+        scrip_master._scrip_master_df = None
+        scrip_master.load_scrip_master_csv(paths=[NSE_SCRIP_MASTER_PATH])
+        with patch("web.shared.symbol_helpers.get_nearest_valid_nifty_expiry", wraps=scrip_master.get_nearest_valid_nifty_expiry):
+            with patch("common.config.datetime") as mock_dt:
+                mock_dt.now.return_value = datetime(2026, 11, 20, 10, 0)
+                symbol = suggest_option_symbol("NIFTY", 25900, "CE", 0)
+        self.assertTrue(symbol.startswith("NIFTY26NOV"), symbol)
+        self.assertNotIn("26D01", symbol)
 
     def test_parse_letter_month_weekly_symbol(self):
         parts = parse_symbol_parts("SENSEX26O0172900CE")

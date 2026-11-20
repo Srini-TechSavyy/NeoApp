@@ -52,6 +52,13 @@ class NiftyExpiryHolidayTests(unittest.TestCase):
         nxt = next_nifty_expiry_date()
         self.assertGreater(nxt, date(2026, 3, 2))
 
+    def test_preponed_nov_2026_monthly_uses_26nov_token(self):
+        # Tue 2026-11-24 is an NSE holiday → effective monthly expiry 2026-11-23 → 26NOV.
+        self.assertEqual(expiry_date_to_token(date(2026, 11, 23)), "26NOV")
+
+    def test_expiry_tokens_equivalent_n23_and_26nov(self):
+        self.assertTrue(scrip_master._expiry_tokens_equivalent("26N23", "26NOV"))
+
 
 class ScripMasterContractTests(unittest.TestCase):
     def tearDown(self):
@@ -95,7 +102,8 @@ class ScripMasterContractTests(unittest.TestCase):
 
     def test_expiry_sort_key_monthly_october_not_fallback(self):
         monthly = scrip_master._expiry_sort_key("26OCT")
-        self.assertEqual(monthly, (2026, 10, 28))
+        eff = effective_expiry_date(nominal_monthly_expiry(2026, 10))
+        self.assertEqual(monthly, (eff.year, eff.month, eff.day))
         self.assertNotEqual(monthly, (9999, 12, 31))
 
     def test_expiry_sort_key_october_weekly_26O19(self):
@@ -117,6 +125,19 @@ class ScripMasterContractTests(unittest.TestCase):
         self.assertEqual(
             scrip_master.get_nearest_valid_nifty_expiry(date(2026, 10, 16)),
             "26O19",
+        )
+
+    def test_list_valid_nifty_expiries_nov_2026_nearest_26nov(self):
+        scrip_master._token_cache = {
+            "NIFTY26NOV25900CE": "1",
+            "NIFTY26D0125900CE": "2",
+        }
+        expiries = scrip_master.list_valid_nifty_expiries(date(2026, 11, 20))
+        self.assertIn("26NOV", expiries)
+        self.assertEqual(expiries[0], "26NOV")
+        self.assertEqual(
+            scrip_master.get_nearest_valid_nifty_expiry(date(2026, 11, 20)),
+            "26NOV",
         )
 
 
